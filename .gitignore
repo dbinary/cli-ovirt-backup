@@ -125,3 +125,4 @@ dmypy.json
 vm_backup.py
 example.log
 ca.pem
+*.ovf
