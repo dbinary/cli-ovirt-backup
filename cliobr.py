@@ -5,7 +5,9 @@ import logging
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
 
-logging.basicConfig(level=logging.DEBUG, filename='example.log')
+
+FORMAT = '%(asctime)s %(levelname)s %(message)s'
+logging.basicConfig(level=logging.DEBUG, format=FORMAT, filename='example.log')
 
 
 @click.group()
@@ -22,7 +24,7 @@ def cli():
     '--password', '-p', envvar='OVIRTPASS', required=True, help='password for oVirt user'
 )
 @click.option(
-    '--ca', '-c', envvar='OVIRTCA', help='path for ca certificate of Manager'
+    '--ca', '-c', envvar='OVIRTCA', required=True, type=click.Path(), help='path for ca certificate of Manager'
 )
 @click.option(
     '--url', '-U', envvar='OVIRTURL', required=True, help='url for oVirt API'
@@ -38,6 +40,7 @@ def backup(username, password, ca, vmname, url, debug):
         log=logging.getLogger(),
     )
     logging.info('Connected to the server.')
+    click.echo('Connected to the server.')
 
 
 @cli.command()
