@@ -58,3 +58,59 @@ def createsnapshot(s_service, types, snap_description):
         ),
     )
     return snap
+
+
+def waitingsnapshot(snap, types, logging, time, s_service, clickecho, dbg):
+    while snap.snapshot_status != types.SnapshotStatus.OK:
+        logging.info(
+            'Waiting till the snapshot is created, the satus is now \'{}\'.'.format(snap.snapshot_status))
+        if dbg:
+            clickecho.echo('Waiting till the snapshot is created, the satus is now \'{}\'.'.format(
+                snap.snapshot_status))
+        time.sleep(10)
+        snap = s_service.get()
+    logging.info('The snapshot is now complete.')
+    if dbg:
+        clickecho.echo('The snapshot is now complete.')
+
+
+def populateattachments(s_disks, snap, attachments, a_service, types, logging, clickecho, dbg):
+    for snap_disk in s_disks:
+        attachment = a_service.add(
+            attachment=types.DiskAttachment(
+                disk=types.Disk(
+                    id=snap_disk.id,
+                    snapshot=types.Snapshot(
+                        id=snap.id,
+                    ),
+                ),
+                active=True,
+                bootable=False,
+                interface=types.DiskInterface.VIRTIO,
+            ),
+        )
+        attachments.append(attachment)
+        logging.info(
+            'Attached disk \'{}\' to the agent virtual machine.'.format(
+                attachment.disk.id)
+        )
+        if dbg:
+            clickecho.echo(
+                'Attached disk \'{}\' to the agent virtual machine.'.format(
+                    attachment.disk.id)
+            )
+
+
+def disksattachments(attachments, logging, dbg, clickecho):
+    diskarray = []
+    for attachment in attachments:
+        if attachment.logical_name is not None:
+            logging.info(
+                'Logical name for disk \'{}\' is \'{}\'.'.format(
+                    attachment.disk.id, attachment.logicalname))
+            if dbg:
+                clickecho.echo(
+                    'Logical name for disk \'{}\' is \'{}\'.'.format(
+                        attachment.disk.id, attachment.logicalname))
+            diskarray.append(attachment)
+    return diskarray
