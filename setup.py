@@ -10,6 +10,6 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        cliobr=cliobr:hello
+        cliobr=cliobr:cli
     ''',
 )
