@@ -4,7 +4,7 @@ import click
 import logging
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
-from cliobrlib import vmobj, send_events, writeconfig, createsnapshot
+from cliobrlib import *
 
 
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
@@ -99,6 +99,22 @@ def backup(username, password, ca, vmname, url, debug):
     if debug:
         click.echo('Sent request to create snapshot \'{}\', the id is \'{}\'.'.format(
             snap.description, snap.id))
+
+    snap_service = snaps_service.snapshot_service(snap.id)
+    waitingsnapshot(snap, types, logging, time, snap_service, click, debug)
+
+    # Retrieve the descriptions of the disks of the snapshot:
+    snap_disks_service = snap_service.disks_service()
+    snap_disks = snap_disks_service.list()
+
+    # Attach disk service
+    attachments_service = agent_vm_service.disk_attachments_service()
+    attachments = []
+    populateattachments(snap_disks, snap, attachments,
+                        attachments_service, types, logging, click, debug)
+
+    disks = disksattachments(attachments, logging, debug, click)
+    click.echo(disks)
     # Finish the connection to the VM Manager
     connection.close()
     logging.info('Disconnected to the server.')
