@@ -124,3 +124,4 @@ dmypy.json
 .vscode/settings.json
 vm_backup.py
 example.log
+ca.pem
