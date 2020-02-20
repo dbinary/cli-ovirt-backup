@@ -9,6 +9,7 @@ from cliobrlib import vmobj
 
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=FORMAT, filename='example.log')
+AgentVM = 'backuprestore'
 
 
 @click.group()
@@ -64,6 +65,14 @@ def backup(username, password, ca, vmname, url, debug):
     logging.info(
         'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
             vm.name, vm.id)
+    )
+    if debug:
+        click.echo(
+            'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vm.name, vm.id))
+    vmAgent = vmobj(vms_service, AgentVM)
+    logging.info(
+        'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
+            vmAgent.name, vmAgent.id)
     )
     if debug:
         click.echo(
