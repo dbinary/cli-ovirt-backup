@@ -4,12 +4,13 @@ import click
 import logging
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
-from cliobrlib import vmobj
+from cliobrlib import vmobj, send_events, writeconfig, createsnapshot
 
 
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=FORMAT, filename='example.log')
 AgentVM = 'backuprestore'
+Description = 'cli-ovirt-backup'
 
 
 @click.group()
@@ -77,7 +78,32 @@ def backup(username, password, ca, vmname, url, debug):
     if debug:
         click.echo(
             'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vm.name, vm.id))
+    # Find the services that manage the data and agent virtual machines:
+    data_vm_service = vms_service.vm_service(vm.id)
+    agent_vm_service = vms_service.vm_service(vmAgent.id)
+
+    send_events(events_service, event_id, types, vm, Description)
+
+    ovf_file = writeconfig(vm)
+    logging.info('Wrote OVF to file \'{}\''.format(
+        os.path.abspath(ovf_file)))
+    if debug:
+        click.echo('Wrote OVF to file \'{}\''.format(
+            os.path.abspath(ovf_file)))
+
+    snaps_service = data_vm_service.snapshots_service()
+
+    snap = createsnapshot(snaps_service, types, Description)
+    logging.info('Sent request to create snapshot \'{}\', the id is \'{}\'.'.format(
+        snap.description, snap.id))
+    if debug:
+        click.echo('Sent request to create snapshot \'{}\', the id is \'{}\'.'.format(
+            snap.description, snap.id))
+    # Finish the connection to the VM Manager
     connection.close()
+    logging.info('Disconnected to the server.')
+    if debug:
+        click.echo('Disconnected to the server.')
 
 
 @cli.command()
