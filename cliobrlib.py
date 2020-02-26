@@ -1,3 +1,6 @@
+import subprocess
+
+
 def vmobj(vmservice, vm_name):
     """Search for vm by name and return vm object
     Parameters:
@@ -63,9 +66,9 @@ def createsnapshot(s_service, types, snap_description):
 def waitingsnapshot(snap, types, logging, time, s_service, clickecho, dbg):
     while snap.snapshot_status != types.SnapshotStatus.OK:
         logging.info(
-            'Waiting till the snapshot is created, the satus is now \'{}\'.'.format(snap.snapshot_status))
+            'Waiting till the snapshot is created, the satus is \'{}\'.'.format(snap.snapshot_status))
         if dbg:
-            clickecho.echo('Waiting till the snapshot is created, the satus is now \'{}\'.'.format(
+            clickecho.echo('Waiting till the snapshot is created, the satus is \'{}\'.'.format(
                 snap.snapshot_status))
         time.sleep(10)
         snap = s_service.get()
@@ -74,7 +77,8 @@ def waitingsnapshot(snap, types, logging, time, s_service, clickecho, dbg):
         clickecho.echo('The snapshot is now complete.')
 
 
-def populateattachments(s_disks, snap, attachments, a_service, types, logging, clickecho, dbg):
+def populateattachments(s_disks, snap, a_service, types, logging, clickecho, dbg):
+    attachs = []
     for snap_disk in s_disks:
         attachment = a_service.add(
             attachment=types.DiskAttachment(
@@ -89,7 +93,7 @@ def populateattachments(s_disks, snap, attachments, a_service, types, logging, c
                 interface=types.DiskInterface.VIRTIO,
             ),
         )
-        attachments.append(attachment)
+        attachs.append(attachment)
         logging.info(
             'Attached disk \'{}\' to the agent virtual machine.'.format(
                 attachment.disk.id)
@@ -99,18 +103,38 @@ def populateattachments(s_disks, snap, attachments, a_service, types, logging, c
                 'Attached disk \'{}\' to the agent virtual machine.'.format(
                     attachment.disk.id)
             )
+    return attachs
 
 
 def disksattachments(attachments, logging, dbg, clickecho):
     diskarray = []
     for attachment in attachments:
+        logging.info('attachment: {}'.format(attachment))
+#        logging.info('attachment logicalname: {}'.format(
+#            attachment.logicalname))
+        logging.info('attachment logical_name: {}'.format(
+            attachment.logical_name))
         if attachment.logical_name is not None:
             logging.info(
                 'Logical name for disk \'{}\' is \'{}\'.'.format(
-                    attachment.disk.id, attachment.logicalname))
+                    attachment.disk.id, attachment.logical_name))
             if dbg:
                 clickecho.echo(
                     'Logical name for disk \'{}\' is \'{}\'.'.format(
                         attachment.disk.id, attachment.logicalname))
             diskarray.append(attachment)
+        else:
+            logging.info(
+                'Logical name for disk \'{}\'.'.format(
+                    attachment.disk.id))
     return diskarray
+
+
+def converttoqcow2():
+    from subprocess import check_output
+
+    disks = check_output(
+        'lsblk -do NAME,TYPE |grep disk |grep -v [vs]da|cut -d" " -f1|xargs', shell=True)
+    disks = disks.strip()
+    disks = disks.split(' ')
+    return disks
