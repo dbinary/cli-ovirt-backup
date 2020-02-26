@@ -10,7 +10,6 @@ setup(
     description='Script for backup and restore virtual machines in oVirt/RHV environment',
     py_modules=['cliobr', 'helpers'],
     license='MIT',
-    # requires='python-ovirt-engine-sdk4',
     install_requires=[
         'Click',
         'ovirt-engine-sdk-python'
