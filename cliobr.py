@@ -5,7 +5,7 @@ import click
 import logging
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
-from cliobrlib import *
+from cliobr.helpers import *
 
 
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
