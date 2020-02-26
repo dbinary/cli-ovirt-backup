@@ -1,5 +1,6 @@
 import time
 import os
+import subprocess
 import click
 import logging
 import ovirtsdk4 as sdk
@@ -109,12 +110,16 @@ def backup(username, password, ca, vmname, url, debug):
 
     # Attach disk service
     attachments_service = agent_vm_service.disk_attachments_service()
-    attachments = []
-    populateattachments(snap_disks, snap, attachments,
-                        attachments_service, types, logging, click, debug)
+
+    attachments = populateattachments(
+        snap_disks, snap, attachments_service, types, logging, click, debug)
 
     disks = disksattachments(attachments, logging, debug, click)
-    click.echo(disks)
+
+    devices = converttoqcow2()
+
+    print(devices)
+
     # Finish the connection to the VM Manager
     connection.close()
     logging.info('Disconnected to the server.')
