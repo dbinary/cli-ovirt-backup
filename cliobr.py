@@ -5,7 +5,7 @@ import click
 import logging
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
-from cliobr.helpers import *
+import helpers
 
 
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
@@ -63,7 +63,7 @@ def backup(username, password, ca, vmname, url, debug):
     # Get the reference to the service that manages the virtual machines:
     vms_service = system_service.vms_service()
 
-    vm = vmobj(vms_service, vmname)
+    vm = helpers.vmobj(vms_service, vmname)
     logging.info(
         'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
             vm.name, vm.id)
@@ -71,7 +71,7 @@ def backup(username, password, ca, vmname, url, debug):
     if debug:
         click.echo(
             'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vm.name, vm.id))
-    vmAgent = vmobj(vms_service, AgentVM)
+    vmAgent = helpers.vmobj(vms_service, AgentVM)
     logging.info(
         'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
             vmAgent.name, vmAgent.id)
@@ -83,9 +83,9 @@ def backup(username, password, ca, vmname, url, debug):
     data_vm_service = vms_service.vm_service(vm.id)
     agent_vm_service = vms_service.vm_service(vmAgent.id)
 
-    send_events(events_service, event_id, types, vm, Description)
+    helpers.send_events(events_service, event_id, types, vm, Description)
 
-    ovf_file = writeconfig(vm)
+    ovf_file = helpers.writeconfig(vm)
     logging.info('Wrote OVF to file \'{}\''.format(
         os.path.abspath(ovf_file)))
     if debug:
@@ -94,7 +94,7 @@ def backup(username, password, ca, vmname, url, debug):
 
     snaps_service = data_vm_service.snapshots_service()
 
-    snap = createsnapshot(snaps_service, types, Description)
+    snap = helpers.createsnapshot(snaps_service, types, Description)
     logging.info('Sent request to create snapshot \'{}\', the id is \'{}\'.'.format(
         snap.description, snap.id))
     if debug:
@@ -102,7 +102,8 @@ def backup(username, password, ca, vmname, url, debug):
             snap.description, snap.id))
 
     snap_service = snaps_service.snapshot_service(snap.id)
-    waitingsnapshot(snap, types, logging, time, snap_service, click, debug)
+    helpers.waitingsnapshot(snap, types, logging, time,
+                            snap_service, click, debug)
 
     # Retrieve the descriptions of the disks of the snapshot:
     snap_disks_service = snap_service.disks_service()
@@ -111,12 +112,12 @@ def backup(username, password, ca, vmname, url, debug):
     # Attach disk service
     attachments_service = agent_vm_service.disk_attachments_service()
 
-    attachments = populateattachments(
+    attachments = helpers.populateattachments(
         snap_disks, snap, attachments_service, types, logging, click, debug)
 
-    disks = disksattachments(attachments, logging, debug, click)
+    disks = helpers.disksattachments(attachments, logging, debug, click)
 
-    devices = converttoqcow2()
+    devices = helpers.converttoqcow2()
 
     print(devices)
 
