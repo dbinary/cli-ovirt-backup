@@ -131,12 +131,15 @@ def getdevices():
     return disks
 
 
-def converttoqcow2(devices, path, dbg):
+def converttoqcow2(devices, path, dbg, logging, clickecho):
     from subprocess import call
 
     for uuid, device in devices.items():
+        logging.info('Converting uuid {}, device {}'.format(uuid, device))
         call(['qemu-img', 'convert', '-f', 'raw', '-O',
               'qcow2', device, path + uuid + '.qcow2'])
         if dbg:
+            clickecho.echo(
+                'Converting uuid {}, device {}'.format(uuid, device))
             call(['qemu-img', 'convert', '-p', '-f', 'raw', '-O',
                   'qcow2', device, path + uuid + '.qcow2'])
