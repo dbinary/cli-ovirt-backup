@@ -91,15 +91,6 @@ def populateattachments(s_disks, snap, a_service, types, logging, clickecho, dbg
             ),
         )
         attachs.append(attachment)
-        logging.info(
-            'Attached disk \'{}\' to the agent virtual machine.'.format(
-                attachment.disk.id)
-        )
-        if dbg:
-            clickecho.echo(
-                'Attached disk \'{}\' to the agent virtual machine.'.format(
-                    attachment.disk.id)
-            )
     return attachs
 
 
@@ -127,7 +118,7 @@ def disksattachments(attachments, logging, dbg, clickecho):
     return diskarray
 
 
-def converttoqcow2():
+def getdevices():
     from subprocess import check_output
 
     disks = check_output(
@@ -136,3 +127,13 @@ def converttoqcow2():
     disks = disks.decode()
     disks = disks.split(' ')
     return disks
+
+
+def converttoqcow2(devices, dbg):
+    from subprocess import call
+    for device in devices:
+        call(['qemu-img', 'convert', '-f', 'raw', '-O',
+              'qcow2', device, '/tmp/' + device + '.qcow2'])
+        if dbg:
+            call(['qemu-img', 'convert', '-p', '-f', 'raw', '-O',
+                  'qcow2', device, '/tmp/' + device + '.qcow2'])
