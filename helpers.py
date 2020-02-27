@@ -13,7 +13,7 @@ def vmobj(vmservice, vm_name):
     return data_vm
 
 
-def send_events(e_service, e_id, types, data_vm, desc):
+def send_events(e_service, e_id, types, data_vm, desc, message):
     """Send events to manager for tasks
     Parameters:
         e_service: service for events
@@ -30,10 +30,7 @@ def send_events(e_service, e_id, types, data_vm, desc):
             origin=desc,
             severity=types.LogSeverity.NORMAL,
             custom_id=e_id,
-            description=(
-                'Backup of virtual machine \'%s\' using snapshot \'%s\' is '
-                'starting.' % (data_vm.name, desc)
-            ),
+            description=message,
         ),
     )
 
@@ -133,7 +130,7 @@ def converttoqcow2(devices, dbg):
     from subprocess import call
     for device in devices:
         call(['qemu-img', 'convert', '-f', 'raw', '-O',
-              'qcow2', device, '/tmp/' + device + '.qcow2'])
+              'qcow2', '/dev/'+device, '/tmp/' + device + '.qcow2'])
         if dbg:
             call(['qemu-img', 'convert', '-p', '-f', 'raw', '-O',
-                  'qcow2', device, '/tmp/' + device + '.qcow2'])
+                  'qcow2', '/dev/'+device, '/tmp/' + device + '.qcow2'])
