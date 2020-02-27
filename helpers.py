@@ -46,7 +46,7 @@ def writeconfig(data_vm, path):
         data_vm: vm object
     """
     ovf_data = data_vm.initialization.configuration.data
-    ovf_file = path + '%s-%s.ovf' % (data_vm.name, data_vm.id)
+    ovf_file = path + '/' + '%s-%s.ovf' % (data_vm.name, data_vm.id)
     with open(ovf_file, 'wb') as ovs_fd:
         ovs_fd.write(ovf_data.encode('utf-8'))
     return ovf_file

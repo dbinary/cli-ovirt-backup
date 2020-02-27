@@ -71,7 +71,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path):
     ts = str(event_id)
 
     TIMESTAMP = ts.replace('.', '')
-    DIR_SAVE = backup_path+'/'+vm.name+TIMESTAMP
+    DIR_SAVE = backup_path+'/'+vm.name+'-'+TIMESTAMP
 
     logging.info(
         'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
