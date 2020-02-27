@@ -115,11 +115,22 @@ def backup(username, password, ca, vmname, url, debug):
     attachments = helpers.populateattachments(
         snap_disks, snap, attachments_service, types, logging, click, debug)
 
-    disks = helpers.disksattachments(attachments, logging, debug, click)
+    for attach in attachments:
+        logging.info(
+            'Attached disk \'{}\' to the agent virtual machine.'.format(
+                attach.disk.id)
+        )
+        if debug:
+            attach.echo(
+                'Attached disk \'{}\' to the agent virtual machine.'.format(
+                    attach.disk.id)
+            )
 
-    devices = helpers.converttoqcow2()
+#    disks = helpers.disksattachments(attachments, logging, debug, click)
 
-    print(devices)
+    devices = helpers.getdevices()
+
+    helpers.converttoqcow2(devices, debug)
 
     # Finish the connection to the VM Manager
     connection.close()
