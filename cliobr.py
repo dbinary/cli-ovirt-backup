@@ -121,7 +121,7 @@ def backup(username, password, ca, vmname, url, debug):
                 attach.disk.id)
         )
         if debug:
-            attach.echo(
+            click.echo(
                 'Attached disk \'{}\' to the agent virtual machine.'.format(
                     attach.disk.id)
             )
