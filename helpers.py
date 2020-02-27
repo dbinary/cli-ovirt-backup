@@ -1,6 +1,3 @@
-import subprocess
-
-
 def vmobj(vmservice, vm_name):
     """Search for vm by name and return vm object
     Parameters:
@@ -136,5 +133,6 @@ def converttoqcow2():
     disks = check_output(
         'lsblk -do NAME,TYPE |grep disk |grep -v [vs]da|cut -d" " -f1|xargs', shell=True)
     disks = disks.strip()
+    disks = disks.decode()
     disks = disks.split(' ')
     return disks
