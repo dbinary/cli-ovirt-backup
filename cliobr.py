@@ -148,7 +148,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path):
     block_devices = helpers.getdevices()
     devices = {}
     for i in range(len(attachments)):
-        devices[attachments[i]] = '/dev/' + block_devices[i]
+        devices[attachments[i].disk.id] = '/dev/' + block_devices[i]
 
     helpers.converttoqcow2(devices, DIR_SAVE, debug)
 
