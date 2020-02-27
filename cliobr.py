@@ -33,8 +33,11 @@ def cli():
 @click.option(
     '--url', '-U', envvar='OVIRTURL', required=True, help='url for oVirt API https://manager.example.com/ovirt-engine/api'
 )
+@click.option(
+    '--backup-path', '-b', envvar='BACKUPPATH', type=click.Path(), default='/ovirt-backup', show_default=True, help='path for store backups'
+)
 @click.option('--debug', is_flag=True, default=False, help='debug mode')
-def backup(username, password, ca, vmname, url, debug):
+def backup(username, password, ca, vmname, url, debug, backup_path):
     connection = sdk.Connection(
         url=url,
         username=username,
@@ -83,7 +86,12 @@ def backup(username, password, ca, vmname, url, debug):
     data_vm_service = vms_service.vm_service(vm.id)
     agent_vm_service = vms_service.vm_service(vmAgent.id)
 
-    helpers.send_events(events_service, event_id, types, vm, Description)
+    message = (
+        'Backup of virtual machine \'%s\' using snapshot \'%s\' is '
+        'starting.' % (vm.name, Description)
+    )
+    helpers.send_events(events_service, event_id,
+                        types, vm, Description, message)
 
     ovf_file = helpers.writeconfig(vm)
     logging.info('Wrote OVF to file \'{}\''.format(
@@ -126,11 +134,35 @@ def backup(username, password, ca, vmname, url, debug):
                     attach.disk.id)
             )
 
-#    disks = helpers.disksattachments(attachments, logging, debug, click)
-
     devices = helpers.getdevices()
 
     helpers.converttoqcow2(devices, debug)
+
+    for attach in attachments:
+        attachment_service = attachments_service.attachment_service(attach.id)
+        attachment_service.remove()
+        logging.info(
+            'Detached disk \'%s\' to from the agent virtual machine.',
+            attach.disk.id,
+        )
+        if debug:
+            click.echo(
+                'Detached disk \'{}\' to from the agent virtual machine.'.format(
+                    attach.disk.id)
+            )
+    # Remove the snapshot:
+    snap_service.remove()
+    logging.info('Removed the snapshot \'%s\'.', snap.description)
+    if debug:
+        click.echo('Removed the snapshot \'{}\'.'.format(snap.description))
+
+    event_id += 1
+    message = (
+        'Backup of virtual machine \'%s\' using snapshot \'%s\' is '
+        'completed.' % (vm.name, Description)
+    )
+    helpers.send_events(events_service, event_id,
+                        types, vm, Description, message)
 
     # Finish the connection to the VM Manager
     connection.close()
@@ -143,6 +175,8 @@ def backup(username, password, ca, vmname, url, debug):
 @click.argument('vmname')
 @click.option(
     '--username', '-u', envvar='OVIRTUSER', help='username for oVirt API'
+
+
 )
 @click.option(
     '--password', '-p', envvar='OVIRTPASS', help='password for oVirt user'
