@@ -150,7 +150,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path):
     for i in range(len(attachments)):
         devices[attachments[i].disk.id] = '/dev/' + block_devices[i]
 
-    helpers.converttoqcow2(devices, DIR_SAVE, debug)
+    helpers.converttoqcow2(devices, DIR_SAVE, debug, logging, click)
 
     for attach in attachments:
         attachment_service = attachments_service.attachment_service(attach.id)
