@@ -46,6 +46,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path):
         debug=debug,
         log=logging.getLogger(),
     )
+
     logging.info('Connected to the server.')
     if debug:
         click.echo('Connected to the server.')
@@ -67,6 +68,11 @@ def backup(username, password, ca, vmname, url, debug, backup_path):
     vms_service = system_service.vms_service()
 
     vm = helpers.vmobj(vms_service, vmname)
+    ts = str(event_id)
+
+    TIMESTAMP = ts.replace('.', '')
+    DIR_SAVE = backup_path+'/'+vm.name+TIMESTAMP
+
     logging.info(
         'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
             vm.name, vm.id)
@@ -82,6 +88,11 @@ def backup(username, password, ca, vmname, url, debug, backup_path):
     if debug:
         click.echo(
             'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vm.name, vm.id))
+
+    helpers.createdir(DIR_SAVE)
+    logging.info('Creating directory {}.'.format(DIR_SAVE))
+    if debug:
+        click.echo('Creating directory {}.'.format(DIR_SAVE))
     # Find the services that manage the data and agent virtual machines:
     data_vm_service = vms_service.vm_service(vm.id)
     agent_vm_service = vms_service.vm_service(vmAgent.id)
@@ -93,7 +104,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path):
     helpers.send_events(events_service, event_id,
                         types, vm, Description, message)
 
-    ovf_file = helpers.writeconfig(vm)
+    ovf_file = helpers.writeconfig(vm, DIR_SAVE)
     logging.info('Wrote OVF to file \'{}\''.format(
         os.path.abspath(ovf_file)))
     if debug:
@@ -134,9 +145,12 @@ def backup(username, password, ca, vmname, url, debug, backup_path):
                     attach.disk.id)
             )
 
-    devices = helpers.getdevices()
+    block_devices = helpers.getdevices()
+    devices = {}
+    for i in range(len(attachments)):
+        devices[attachments[i]] = '/dev/' + block_devices[i]
 
-    helpers.converttoqcow2(devices, debug)
+    helpers.converttoqcow2(devices, DIR_SAVE, debug)
 
     for attach in attachments:
         attachment_service = attachments_service.attachment_service(attach.id)

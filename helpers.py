@@ -35,13 +35,18 @@ def send_events(e_service, e_id, types, data_vm, desc, message):
     )
 
 
-def writeconfig(data_vm):
+def createdir(path):
+    import os
+    os.makedirs(path)
+
+
+def writeconfig(data_vm, path):
     """Write XML configuration of vm
     Parameters:
         data_vm: vm object
     """
     ovf_data = data_vm.initialization.configuration.data
-    ovf_file = '%s-%s.ovf' % (data_vm.name, data_vm.id)
+    ovf_file = path + '%s-%s.ovf' % (data_vm.name, data_vm.id)
     with open(ovf_file, 'wb') as ovs_fd:
         ovs_fd.write(ovf_data.encode('utf-8'))
     return ovf_file
@@ -126,11 +131,12 @@ def getdevices():
     return disks
 
 
-def converttoqcow2(devices, dbg):
+def converttoqcow2(devices, path, dbg):
     from subprocess import call
-    for device in devices:
+
+    for uuid, device in devices.items():
         call(['qemu-img', 'convert', '-f', 'raw', '-O',
-              'qcow2', '/dev/'+device, '/tmp/' + device + '.qcow2'])
+              'qcow2', device, path + uuid + '.qcow2'])
         if dbg:
             call(['qemu-img', 'convert', '-p', '-f', 'raw', '-O',
-                  'qcow2', '/dev/'+device, '/tmp/' + device + '.qcow2'])
+                  'qcow2', device, path + uuid + '.qcow2'])
