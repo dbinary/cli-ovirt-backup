@@ -9,7 +9,6 @@ import helpers
 
 
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
-logging.basicConfig(level=logging.DEBUG, format=FORMAT, filename='example.log')
 AgentVM = 'backuprestore'
 Description = 'cli-ovirt-backup'
 
@@ -36,8 +35,13 @@ def cli():
 @click.option(
     '--backup-path', '-b', envvar='BACKUPPATH', type=click.Path(), default='/ovirt-backup', show_default=True, help='path for store backups'
 )
+@click.option(
+    '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-backup.log', show_default=True, help='path for store backups'
+)
 @click.option('--debug', is_flag=True, default=False, help='debug mode')
-def backup(username, password, ca, vmname, url, debug, backup_path):
+def backup(username, password, ca, vmname, url, debug, backup_path, log):
+    logging.basicConfig(level=logging.DEBUG, format=FORMAT,
+                        filename=log)
     connection = sdk.Connection(
         url=url,
         username=username,
