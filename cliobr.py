@@ -103,8 +103,8 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     agent_vm_service = vms_service.vm_service(vmAgent.id)
 
     message = (
-        'Backup of virtual machine \'%s\' using snapshot \'%s\' is '
-        'starting.' % (vm.name, Description)
+        'Backup of virtual machine \'{}\' using snapshot \'{}\' is '
+        'starting.'.format(vm.name, Description)
     )
     helpers.send_events(events_service, event_id,
                         types, vm, Description, message)
@@ -161,8 +161,8 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
         attachment_service = attachments_service.attachment_service(attach.id)
         attachment_service.remove()
         logging.info(
-            'Detached disk \'%s\' to from the agent virtual machine.',
-            attach.disk.id,
+            'Detached disk \'{}\' to from the agent virtual machine.'.format(
+                attach.disk.id)
         )
         if debug:
             click.echo(
@@ -171,14 +171,22 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
             )
     # Remove the snapshot:
     snap_service.remove()
-    logging.info('Removed the snapshot \'%s\'.', snap.description)
+    logging.info('Removed the snapshot \'{}}\'.'.format(snap.description))
     if debug:
         click.echo('Removed the snapshot \'{}\'.'.format(snap.description))
 
+    if archive:
+        import shutil
+        logging.info('Archiving \'{}\' in \'{}\'.zip '.format(
+            DIR_SAVE, DIR_SAVE))
+        shutil.make_archive(DIR_SAVE + '.zip', 'zip', DIR_SAVE)
+        if debug:
+            click.echo('Archiving \'{}\' in \'{}\'.zip '.format(
+                DIR_SAVE, DIR_SAVE))
     event_id += 1
     message = (
-        'Backup of virtual machine \'%s\' using snapshot \'%s\' is '
-        'completed.' % (vm.name, Description)
+        'Backup of virtual machine \'{}\' using snapshot \'{}\' is '
+        'completed.'.format(vm.name, Description)
     )
     helpers.send_events(events_service, event_id,
                         types, vm, Description, message)
