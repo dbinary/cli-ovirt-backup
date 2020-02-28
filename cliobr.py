@@ -38,8 +38,9 @@ def cli():
 @click.option(
     '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-backup.log', show_default=True, help='path log file'
 )
-@click.option('--debug', is_flag=True, default=False, help='debug mode')
-def backup(username, password, ca, vmname, url, debug, backup_path, log):
+@click.option('--debug', '-d', is_flag=True, default=False, help='debug mode')
+@click.option('--archive', '-a', is_flag=True, default=False, help='archive backup')
+def backup(username, password, ca, vmname, url, debug, backup_path, log, archive):
     logging.basicConfig(level=logging.DEBUG, format=FORMAT,
                         filename=log)
     connection = sdk.Connection(
