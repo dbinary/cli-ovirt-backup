@@ -171,7 +171,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
             )
     # Remove the snapshot:
     snap_service.remove()
-    logging.info('Removed the snapshot \'{}}\'.'.format(snap.description))
+    logging.info('Removed the snapshot \'{}\'.'.format(snap.description))
     if debug:
         click.echo('Removed the snapshot \'{}\'.'.format(snap.description))
 
