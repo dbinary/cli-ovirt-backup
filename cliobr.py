@@ -11,9 +11,18 @@ import helpers
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = 'backuprestore'
 Description = 'cli-ovirt-backup'
+VERSION = '0.4.1'
+
+
+def print_version(ctx, param, value):
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo(VERSION)
+    ctx.exit()
 
 
 @click.group()
+@click.option('--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True)
 def cli():
     pass
 
@@ -76,7 +85,8 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     ts = str(event_id)
 
     TIMESTAMP = ts.replace('.', '')
-    DIR_SAVE = backup_path+'/'+vm.name+'-'+TIMESTAMP + '/'
+    FILENAME = vm.name+'-'+TIMESTAMP
+    DIR_SAVE = backup_path+'/'+FILENAME
 
     logging.info(
         'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
@@ -95,9 +105,9 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
             'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vm.name, vm.id))
 
     helpers.createdir(DIR_SAVE)
-    logging.info('Creating directory {}.'.format(DIR_SAVE))
+    logging.info('Creating directory {}.'.format(DIR_SAVE + '/'))
     if debug:
-        click.echo('Creating directory {}.'.format(DIR_SAVE))
+        click.echo('Creating directory {}.'.format(DIR_SAVE + '/'))
     # Find the services that manage the data and agent virtual machines:
     data_vm_service = vms_service.vm_service(vm.id)
     agent_vm_service = vms_service.vm_service(vmAgent.id)
@@ -109,7 +119,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     helpers.send_events(events_service, event_id,
                         types, vm, Description, message)
 
-    ovf_file = helpers.writeconfig(vm, DIR_SAVE)
+    ovf_file = helpers.writeconfig(vm, DIR_SAVE + '/')
     logging.info('Wrote OVF to file \'{}\''.format(
         os.path.abspath(ovf_file)))
     if debug:
@@ -155,7 +165,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     for i in range(len(attachments)):
         devices[attachments[i].disk.id] = '/dev/' + block_devices[i]
 
-    helpers.converttoqcow2(devices, DIR_SAVE, debug, logging, click)
+    helpers.converttoqcow2(devices, DIR_SAVE + '/', debug, logging, click)
 
     for attach in attachments:
         attachment_service = attachments_service.attachment_service(attach.id)
@@ -177,12 +187,13 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
 
     if archive:
         import shutil
-        logging.info('Archiving \'{}\' in \'{}\'.zip '.format(
-            DIR_SAVE, DIR_SAVE))
-        shutil.make_archive(DIR_SAVE + '.zip', 'zip', DIR_SAVE)
+        logging.info('Archiving \'{}\' in \'{}\'.tar.gz '.format(
+            FILENAME, FILENAME))
+        shutil.make_archive(FILENAME, 'gztar', backup_path)
+        shutil.rmtree(DIR_SAVE)
         if debug:
-            click.echo('Archiving \'{}\' in \'{}\'.zip '.format(
-                DIR_SAVE, DIR_SAVE))
+            click.echo('Archiving \'{}\' in \'{}\'.tar.gz '.format(
+                FILENAME, FILENAME))
     event_id += 1
     message = (
         'Backup of virtual machine \'{}\' using snapshot \'{}\' is '
