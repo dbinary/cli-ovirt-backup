@@ -11,7 +11,7 @@ import helpers
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = 'backuprestore'
 Description = 'cli-ovirt-backup'
-VERSION = '0.4.1'
+VERSION = '0.4.3'
 
 
 def print_version(ctx, param, value):
@@ -187,12 +187,12 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
 
     if archive:
         import shutil
-        logging.info('Archiving \'{}\' in \'{}\'.tar.gz '.format(
+        logging.info('Archiving \'{}\' in \'{}.tar.gz\''.format(
             FILENAME, FILENAME))
         shutil.make_archive(FILENAME, 'gztar', backup_path)
         shutil.rmtree(DIR_SAVE)
         if debug:
-            click.echo('Archiving \'{}\' in \'{}\'.tar.gz '.format(
+            click.echo('Archiving \'{}\' in \'{}.tar.gz\''.format(
                 FILENAME, FILENAME))
     event_id += 1
     message = (
