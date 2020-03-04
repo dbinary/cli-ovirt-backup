@@ -124,7 +124,7 @@ def getdevices():
     from subprocess import check_output
 
     disks = check_output(
-        'lsblk -do NAME,TYPE |grep disk |grep -v [vs]da|cut -d" " -f1|xargs', shell=True)
+        'lsblk -do NAME,TYPE |grep disk |grep -v [vsx]da|cut -d" " -f1|xargs', shell=True)
     disks = disks.strip()
     disks = disks.decode()
     disks = disks.split(' ')
