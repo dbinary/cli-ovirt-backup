@@ -210,14 +210,26 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
 
 
 @cli.command()
-@click.argument('vmname')
+@click.argument('filename')
 @click.option(
-    '--username', '-u', envvar='OVIRTUSER', help='username for oVirt API'
-
-
+    '--username', '-u', envvar='OVIRTUSER', default='admin@internal', show_default=True, help='username for oVirt API'
 )
 @click.option(
-    '--password', '-p', envvar='OVIRTPASS', help='password for oVirt user'
+    '--password', '-p', envvar='OVIRTPASS', required=True, help='password for oVirt user'
 )
-def restore(username, password, vmname):
-    click.echo('{} {} {}'.format(username, password, vmname))
+@click.option(
+    '--ca', '-c', envvar='OVIRTCA', required=True, type=click.Path(), help='path for ca certificate of Manager'
+)
+@click.option(
+    '--url', '-U', envvar='OVIRTURL', required=True, help='url for oVirt API https://manager.example.com/ovirt-engine/api'
+)
+@click.option(
+    '--storage-domain', '-s', envvar='OVIRTSD', required=True, help='Name of Storage Domain'
+)
+@click.option(
+    '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-backup.log', show_default=True, help='path log file'
+)
+@click.option('--debug', '-d', is_flag=True, default=False, help='debug mode')
+def restore(username, password, filename, ca, url, storage_domain, log, debug):
+    click.echo('{} {} {} {} {} {} {} {}'.format(username, password,
+                                                ca, url, storage_domain, log, debug, filename))
