@@ -1,3 +1,10 @@
+import os
+import shutil
+import json
+from pathlib import Path
+from subprocess import check_output, call
+
+
 def vmobj(vmservice, vm_name):
     """Search for vm by name and return vm object
     Parameters:
@@ -36,7 +43,6 @@ def send_events(e_service, e_id, types, data_vm, desc, message):
 
 
 def createdir(path):
-    import os
     os.makedirs(path)
 
 
@@ -121,8 +127,6 @@ def disksattachments(attachments, logging, dbg, clickecho):
 
 
 def getdevices():
-    from subprocess import check_output
-
     disks = check_output(
         'lsblk -do NAME,TYPE |grep disk |grep -v [vsx]da|cut -d" " -f1|xargs', shell=True)
     disks = disks.strip()
@@ -132,8 +136,6 @@ def getdevices():
 
 
 def converttoqcow2(devices, path, dbg, logging, clickecho):
-    from subprocess import call
-
     for uuid, device in devices.items():
         logging.info('Converting uuid {}, device {}'.format(uuid, device))
         call(['qemu-img', 'convert', '-f', 'raw', '-O',
@@ -143,3 +145,26 @@ def converttoqcow2(devices, path, dbg, logging, clickecho):
                 'Converting uuid {}, device {}'.format(uuid, device))
             call(['qemu-img', 'convert', '-p', '-f', 'raw', '-O',
                   'qcow2', device, path + uuid + '.qcow2'])
+
+
+def getinfoqcow2(file, restore_path, clickecho):
+    disks_info = []
+    clickecho.echo('Iniciando...')
+    if file.endswith('.gz'):
+        clickecho.echo('Iniciando desempaquetado')
+        shutil.unpack_archive(file, restore_path, 'gztar')
+        tarfile = Path(file).stem
+        f_path = Path(tarfile).stem
+        clickecho.echo('{}'.format(f_path))
+        clickecho.echo('Desempaquetado terminado')
+    else:
+        f_path = file
+
+    disks = Path(f_path).glob('**/*.qcow2')
+    for disk in disks:
+        clickecho.echo('Ejecutando qemu-img')
+        output = check_output(
+            'qemu-img info --output json ' + str(disk), shell=True).decode(encoding='UTF-8')
+        py_object = json.loads(output)
+        disks_info.append(py_object)
+    return disks_info
