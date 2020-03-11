@@ -20,7 +20,7 @@ def vmobj(vmservice, vm_name):
     return data_vm
 
 
-def send_events(e_service, e_id, types, data_vm, desc, message):
+def send_events(e_service, e_id, types, data_vm=None, desc, message):
     """Send events to manager for tasks
     Parameters:
         e_service: service for events
@@ -29,17 +29,27 @@ def send_events(e_service, e_id, types, data_vm, desc, message):
         data_vm: vm object
         desc: description of snapshot
     """
-    e_service.add(
-        event=types.Event(
-            vm=types.Vm(
-                id=data_vm.id,
+    if data_vm:
+        e_service.add(
+            event=types.Event(
+                vm=types.Vm(
+                    id=data_vm.id,
+                ),
+                origin=desc,
+                severity=types.LogSeverity.NORMAL,
+                custom_id=e_id,
+                description=message,
             ),
-            origin=desc,
-            severity=types.LogSeverity.NORMAL,
-            custom_id=e_id,
-            description=message,
-        ),
-    )
+        )
+    else:
+        e_service.add(
+            event=types.Event(
+                origin=desc,
+                severity=types.LogSeverity.NORMAL,
+                custom_id=e_id,
+                description=message,
+            ),
+        )
 
 
 def createdir(path):
@@ -168,3 +178,11 @@ def getinfoqcow2(file, restore_path, clickecho):
         py_object = json.loads(output)
         disks_info.append(py_object)
     return disks_info
+
+
+def ovf_parse(file):
+    with open(filename) as f:
+        ovf_str = f.read()
+
+        ovf = etree.fromstring(bytes(ovf_str, encoding='utf8'))
+    return ovf, ovf_str
