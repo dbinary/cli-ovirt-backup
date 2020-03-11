@@ -177,11 +177,11 @@ def getinfoqcow2(file, restore_path, clickecho):
             'qemu-img info --output json ' + str(disk), shell=True).decode(encoding='UTF-8')
         py_object = json.loads(output)
         disks_info.append(py_object)
-    return disks_info
+    return disks_info, f_path
 
 
 def ovf_parse(file):
-    with open(filename) as f:
+    with open(file) as f:
         ovf_str = f.read()
 
         ovf = etree.fromstring(bytes(ovf_str, encoding='utf8'))

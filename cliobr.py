@@ -6,6 +6,7 @@ import click
 import logging
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
+from pathlib import Path
 import helpers
 
 
@@ -285,38 +286,46 @@ def restore(username, password, filename, ca, url, storage_domain, log, debug, r
 
     # Get the reference to the service that manages the virtual machines:
     vms_service = system_service.vms_service()
-    ovf, ovf_str = helpers.ovf_parse(filename)
+    disks_metadata, extracted_path = helpers.getinfoqcow2(
+        filename, restore_path, click)
+
+    xml_file = Path(extracted_path).glob('**/*.ovf')
+
+    ovf, ovf_str = helpers.ovf_parse(xml_file)
 
     disks = []
     namespace = '{http://schemas.dmtf.org/ovf/envelope/1/}'
 
-    disks_metadata = helpers.getinfoqcow2(filename, restore_path, click)
-    for data in disks_metadata:
-        click.echo('Size: {} File: {}\n'.format(
-            data['virtual-size'], data['filename']))
-
-    for disk in ovf.iter("Disk"):
-        if disk.get(namespace+'volume-format') == 'COW':
+    for qemu_disk, ovf_disk in list(zip(disks_metadata, ovf.iter("Disk"))):
+        if ovf_disk.get(namespace+'volume-format') == 'COW':
             disk_format = types.DiskFormat.COW
         else:
             disk_format = types.DiskFormat.RAW
+        if ovf_disk.get(namespace+'boot'):
+            boot = True
         new_disk = disks_service.add(
             disk=types.Disk(
-                id=disk.get(namespace + 'diskId'),
-                name=disk.get(namespace + 'disk-alias'),
-                description=disk.get(namespace + 'disk-description'),
+                id=ovf_disk.get(namespace + 'diskId'),
+                name=ovf_disk.get(namespace + 'disk-alias'),
+                description=ovf_disk.get(namespace + 'disk-description'),
                 format=disk_format,
-
-                #                provisioned_size=int(props['capacity']) * 2**30,
+                provisioned_size=qemu_disk['virtual-size'],
                 #                initial_size=int(props['populatedSize']),
                 storage_domains=[
                     types.StorageDomain(
                         name=storage_domain
                     )
-                ]
+                ],
+                bootable=boot,
             )
         )
         disks.append(new_disk)
+#    for data in disks_metadata:
+#        click.echo('Size: {} File: {}\n'.format(
+#            data['virtual-size'], data['filename']))
+
+#    for disk in ovf.iter("Disk"):
+
     vm = vms_service.add(
         types.Vm(
             cluster=types.Cluster(
@@ -330,3 +339,7 @@ def restore(username, password, filename, ca, url, storage_domain, log, debug, r
             ),
         ),
     )
+
+    logging.info('Restore of vm: {} complete'.format(vm.name))
+    if debug:
+        click.echo('Restore of vm: {} complete'.format(vm.name))
