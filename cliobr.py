@@ -1,5 +1,6 @@
 import time
 import os
+import re
 import subprocess
 import click
 import logging
@@ -48,7 +49,7 @@ def cli():
     '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-backup.log', show_default=True, help='path log file'
 )
 @click.option('--debug', '-d', is_flag=True, default=False, help='debug mode')
-@click.option('--archive', '-a', is_flag=True, default=False, help='archive backup')
+@click.option('--archive', '-a', is_flag=True, default=True, help='archive backup')
 def backup(username, password, ca, vmname, url, debug, backup_path, log, archive):
     logging.basicConfig(level=logging.DEBUG, format=FORMAT,
                         filename=log)
@@ -84,6 +85,13 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     vm = helpers.vmobj(vms_service, vmname)
     ts = str(event_id)
 
+    message = (
+        'Backup of virtual machine \'{}\' using snapshot \'{}\' is '
+        'starting.'.format(vm.name, Description)
+    )
+    helpers.send_events(events_service, event_id,
+                        types, vm, Description, message)
+
     TIMESTAMP = ts.replace('.', '')
     FILENAME = vm.name+'-'+TIMESTAMP
     DIR_SAVE = backup_path+'/'+FILENAME
@@ -111,13 +119,6 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     # Find the services that manage the data and agent virtual machines:
     data_vm_service = vms_service.vm_service(vm.id)
     agent_vm_service = vms_service.vm_service(vmAgent.id)
-
-    message = (
-        'Backup of virtual machine \'{}\' using snapshot \'{}\' is '
-        'starting.'.format(vm.name, Description)
-    )
-    helpers.send_events(events_service, event_id,
-                        types, vm, Description, message)
 
     ovf_file = helpers.writeconfig(vm, DIR_SAVE + '/')
     logging.info('Wrote OVF to file \'{}\''.format(
@@ -224,7 +225,10 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     '--url', '-U', envvar='OVIRTURL', required=True, help='url for oVirt API https://manager.example.com/ovirt-engine/api'
 )
 @click.option(
-    '--storage-domain', '-s', envvar='OVIRTSD', required=True, help='Name of Storage Domain'
+    '--storage-domain', '-s', envvar='OVIRTSD', required=True, help='Name of oVirt/RHV Storage Domain'
+)
+@click.option(
+    '--cluster', '-C', envvar='OVIRTCLUSTER', required=True, help='Name of oVirt/RHV Cluster'
 )
 @click.option(
     '--restore-path', '-r', envvar='BACKUPPATH', type=click.Path(), default='/ovirt-backup', show_default=True, help='path of backups'
@@ -233,10 +237,96 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-backup.log', show_default=True, help='path log file'
 )
 @click.option('--debug', '-d', is_flag=True, default=False, help='debug mode')
-def restore(username, password, filename, ca, url, storage_domain, log, debug, restore_path):
-    click.echo('{} {} {} {} {} {} {} {} {}'.format(username, password,
-                                                   ca, url, storage_domain, restore_path, log, debug, filename))
+def restore(username, password, filename, ca, url, storage_domain, log, debug, restore_path, cluster):
+
+    logging.basicConfig(level=logging.DEBUG, format=FORMAT,
+                        filename=log)
+    connection = sdk.Connection(
+        url=url,
+        username=username,
+        password=password,
+        ca_file=ca,
+        debug=debug,
+        log=logging.getLogger(),
+    )
+
+    logging.info('Connected to the server.')
+    if debug:
+        click.echo('Connected to the server.')
+
+    # Get the reference to the root of the services tree:
+    system_service = connection.system_service()
+
+    # Get the reference to the service that we will use to send events to
+    # the audit log:
+    events_service = system_service.events_service()
+
+    disks_service = system_service.disks_service()
+
+    # In order to send events we need to also send unique integer ids. These
+    # should usually come from an external database, but in this example we
+    # will just generate them from the current time in seconds since Jan 1st
+    # 1970.
+    event_id = int(time.time())
+
+    name = re.sub("\-.*$", '', filename)
+
+    message = (
+        'Restore of virtual machine \'{}\' using file \'{}\' is '
+        'starting.'.format(name, filename)
+    )
+
+    logging.info(message)
+    if debug:
+        click.echo(message)
+
+    helpers.send_events(events_service, event_id,
+                        types, Description, message)
+
+    # Get the reference to the service that manages the virtual machines:
+    vms_service = system_service.vms_service()
+    ovf, ovf_str = helpers.ovf_parse(filename)
+
+    disks = []
+    namespace = '{http://schemas.dmtf.org/ovf/envelope/1/}'
+
     disks_metadata = helpers.getinfoqcow2(filename, restore_path, click)
     for data in disks_metadata:
         click.echo('Size: {} File: {}\n'.format(
             data['virtual-size'], data['filename']))
+
+    for disk in ovf.iter("Disk"):
+        if disk.get(namespace+'volume-format') == 'COW':
+            disk_format = types.DiskFormat.COW
+        else:
+            disk_format = types.DiskFormat.RAW
+        new_disk = disks_service.add(
+            disk=types.Disk(
+                id=disk.get(namespace + 'diskId'),
+                name=disk.get(namespace + 'disk-alias'),
+                description=disk.get(namespace + 'disk-description'),
+                format=disk_format,
+
+                #                provisioned_size=int(props['capacity']) * 2**30,
+                #                initial_size=int(props['populatedSize']),
+                storage_domains=[
+                    types.StorageDomain(
+                        name=storage_domain
+                    )
+                ]
+            )
+        )
+        disks.append(new_disk)
+    vm = vms_service.add(
+        types.Vm(
+            cluster=types.Cluster(
+                name=cluster,
+            ),
+            initialization=types.Initialization(
+                configuration=types.Configuration(
+                    type=types.ConfigurationType.OVA,
+                    data=ovf_str
+                )
+            ),
+        ),
+    )
