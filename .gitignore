@@ -128,3 +128,4 @@ ca.pem
 *.ovf
 test.py
 .scannerwork/
+*.tar.gz
