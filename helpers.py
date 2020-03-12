@@ -3,6 +3,7 @@ import shutil
 import json
 from pathlib import Path
 from subprocess import check_output, call
+from lxml import etree
 
 
 def vmobj(vmservice, vm_name):
@@ -20,7 +21,7 @@ def vmobj(vmservice, vm_name):
     return data_vm
 
 
-def send_events(e_service, e_id, types, data_vm=None, desc, message):
+def send_events(e_service, e_id, types, desc, message, data_vm=None):
     """Send events to manager for tasks
     Parameters:
         e_service: service for events
@@ -29,7 +30,7 @@ def send_events(e_service, e_id, types, data_vm=None, desc, message):
         data_vm: vm object
         desc: description of snapshot
     """
-    if data_vm:
+    if data_vm is not None:
         e_service.add(
             event=types.Event(
                 vm=types.Vm(
@@ -157,32 +158,20 @@ def converttoqcow2(devices, path, dbg, logging, clickecho):
                   'qcow2', device, path + uuid + '.qcow2'])
 
 
-def getinfoqcow2(file, restore_path, clickecho):
+def getinfoqcow2(file, f_path):
     disks_info = []
-    clickecho.echo('Iniciando...')
-    if file.endswith('.gz'):
-        clickecho.echo('Iniciando desempaquetado')
-        shutil.unpack_archive(file, restore_path, 'gztar')
-        tarfile = Path(file).stem
-        f_path = Path(tarfile).stem
-        clickecho.echo('{}'.format(f_path))
-        clickecho.echo('Desempaquetado terminado')
-    else:
-        f_path = file
 
     disks = Path(f_path).glob('**/*.qcow2')
     for disk in disks:
-        clickecho.echo('Ejecutando qemu-img')
         output = check_output(
             'qemu-img info --output json ' + str(disk), shell=True).decode(encoding='UTF-8')
         py_object = json.loads(output)
         disks_info.append(py_object)
-    return disks_info, f_path
+    return disks_info
 
 
 def ovf_parse(file):
     with open(file) as f:
         ovf_str = f.read()
-
         ovf = etree.fromstring(bytes(ovf_str, encoding='utf8'))
     return ovf, ovf_str
