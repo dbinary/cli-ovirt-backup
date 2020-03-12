@@ -1,14 +1,16 @@
-import time
+import logging
 import os
 import re
 import subprocess
+import time
+import shutil
+from pathlib import Path
+
 import click
-import logging
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
-from pathlib import Path
-import helpers
 
+import helpers
 
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = 'backuprestore'
@@ -91,7 +93,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
         'starting.'.format(vm.name, Description)
     )
     helpers.send_events(events_service, event_id,
-                        types, vm, Description, message)
+                        types, Description, message, vm)
 
     TIMESTAMP = ts.replace('.', '')
     FILENAME = vm.name+'-'+TIMESTAMP
@@ -188,7 +190,6 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
         click.echo('Removed the snapshot \'{}\'.'.format(snap.description))
 
     if archive:
-        import shutil
         logging.info('Archiving \'{}\' in \'{}.tar.gz\''.format(
             FILENAME, FILENAME))
         shutil.make_archive(FILENAME, 'gztar', backup_path)
@@ -202,7 +203,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
         'completed.'.format(vm.name, Description)
     )
     helpers.send_events(events_service, event_id,
-                        types, vm, Description, message)
+                        types, Description, message, vm)
 
     # Finish the connection to the VM Manager
     connection.close()
@@ -212,7 +213,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
 
 
 @cli.command()
-@click.argument('filename')
+@click.argument('file')
 @click.option(
     '--username', '-u', envvar='OVIRTUSER', default='admin@internal', show_default=True, help='username for oVirt API'
 )
@@ -232,13 +233,10 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     '--cluster', '-C', envvar='OVIRTCLUSTER', required=True, help='Name of oVirt/RHV Cluster'
 )
 @click.option(
-    '--restore-path', '-r', envvar='BACKUPPATH', type=click.Path(), default='/ovirt-backup', show_default=True, help='path of backups'
-)
-@click.option(
-    '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-backup.log', show_default=True, help='path log file'
+    '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-restore.log', show_default=True, help='path log file'
 )
 @click.option('--debug', '-d', is_flag=True, default=False, help='debug mode')
-def restore(username, password, filename, ca, url, storage_domain, log, debug, restore_path, cluster):
+def restore(username, password, file, ca, url, storage_domain, log, debug, cluster):
 
     logging.basicConfig(level=logging.DEBUG, format=FORMAT,
                         filename=log)
@@ -270,11 +268,29 @@ def restore(username, password, filename, ca, url, storage_domain, log, debug, r
     # 1970.
     event_id = int(time.time())
 
-    name = re.sub("\-.*$", '', filename)
+    p = Path(file)
+
+    # Get absolute path of restore file
+    abs_path = p.absolute().as_posix()
+    # Get full path of parent
+    parent_path = p.absolute().parent.as_posix()
+    tar_file = p.name
+    suffixes = len(p.suffixes)
+    basedir = ''
+    xml_file = ''
+
+    # Getting name of extracted directory
+    for idx in range(suffixes):
+        if idx < suffixes:
+            basedir_tmp = Path(abs_path).stem
+        if idx == suffixes:
+            basedir = Path(basedir_tmp).stem
+
+    vm_name = re.sub("\-.*$", '', tar_file)
 
     message = (
         'Restore of virtual machine \'{}\' using file \'{}\' is '
-        'starting.'.format(name, filename)
+        'starting.'.format(vm_name, file)
     )
 
     logging.info(message)
@@ -284,47 +300,86 @@ def restore(username, password, filename, ca, url, storage_domain, log, debug, r
     helpers.send_events(events_service, event_id,
                         types, Description, message)
 
+    if abs_path.endswith('.gz'):
+        if not Path(basedir).exists():
+            logging.info('Init descompress')
+            if debug:
+                click.echo('Init descompress')
+            shutil.unpack_archive(file, parent_path, 'gztar')
+            logging.info('Finish decompress')
+            if debug:
+                click.echo('Finish decompress')
+
     # Get the reference to the service that manages the virtual machines:
     vms_service = system_service.vms_service()
-    disks_metadata, extracted_path = helpers.getinfoqcow2(
-        filename, restore_path, click)
-
-    xml_file = Path(extracted_path).glob('**/*.ovf')
+    for f in Path(basedir).glob('**/*.ovf'):
+        xml_file = Path(f).absolute().as_posix()
 
     ovf, ovf_str = helpers.ovf_parse(xml_file)
 
     disks = []
     namespace = '{http://schemas.dmtf.org/ovf/envelope/1/}'
 
-    for qemu_disk, ovf_disk in list(zip(disks_metadata, ovf.iter("Disk"))):
-        if ovf_disk.get(namespace+'volume-format') == 'COW':
+    metadata = []
+    metas = {}
+    elements = ["boot", "volume-format", "diskId",
+                "disk-alias", "disk-description", "size", "fileRef"]
+
+    logging.info('Extracting ovf data')
+    if debug:
+        click.echo('Extracting ovf data')
+    for disk in ovf.iter('Disk'):
+        for element in elements:
+            if element == 'size':
+                metas[str(element)] = int(disk.get(namespace+element)) * 2**30
+            elif element == 'fileRef':
+                metas[str(element)] = str(
+                    disk.get(namespace+element)).split("/")[0]
+                metas[str(element)+'_image'] = str(
+                    disk.get(namespace+element)).split("/")[1]
+            else:
+                metas[str(element)] = disk.get(namespace+element)
+        metadata.append(metas.copy())
+
+    logging.info('Defining disks')
+    if debug:
+        click.echo('Defining disks')
+    for meta in metadata:
+        logging.info('Defining disk {} with image {} and size {}'.format(
+            meta['fileRef'], meta['fileRef_image'], meta['size']))
+
+        if debug:
+            click.echo('Defining disk {}'.format(meta['fileRef']))
+        if meta['volume-format'] == 'COW':
             disk_format = types.DiskFormat.COW
         else:
             disk_format = types.DiskFormat.RAW
-        if ovf_disk.get(namespace+'boot'):
+        if meta['boot']:
             boot = True
         new_disk = disks_service.add(
             disk=types.Disk(
-                id=ovf_disk.get(namespace + 'diskId'),
-                name=ovf_disk.get(namespace + 'disk-alias'),
-                description=ovf_disk.get(namespace + 'disk-description'),
+                id=meta['fileRef'],
+                name=meta['disk-alias'],
+                description=meta['disk-description'],
                 format=disk_format,
-                provisioned_size=qemu_disk['virtual-size'],
-                #                initial_size=int(props['populatedSize']),
+                provisioned_size=meta['size'],
                 storage_domains=[
-                    types.StorageDomain(
-                        name=storage_domain
-                    )
+                    types.StorageDomain(name=storage_domain)
                 ],
                 bootable=boot,
+                image_id=meta['fileRef_image']
             )
         )
-        disks.append(new_disk)
-#    for data in disks_metadata:
-#        click.echo('Size: {} File: {}\n'.format(
-#            data['virtual-size'], data['filename']))
 
-#    for disk in ovf.iter("Disk"):
+        disk_service = disks_service.disk_service(new_disk.id)
+        while disk_service.get().status != types.DiskStatus.OK:
+            time.sleep(5)
+            logging.info('Waiting till the disk is created, the satus is \'{}\'.'.format(
+                disk_service.get().status))
+            if debug:
+                click.echo('Waiting till the disk is created, the satus is \'{}\'.'.format(
+                    disk_service.get().status))
+        disks.append(new_disk)
 
     vm = vms_service.add(
         types.Vm(
@@ -333,7 +388,7 @@ def restore(username, password, filename, ca, url, storage_domain, log, debug, r
             ),
             initialization=types.Initialization(
                 configuration=types.Configuration(
-                    type=types.ConfigurationType.OVA,
+                    type=types.ConfigurationType.OVF,
                     data=ovf_str
                 )
             ),
