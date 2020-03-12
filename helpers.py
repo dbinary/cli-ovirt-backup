@@ -1,3 +1,11 @@
+import os
+import shutil
+import json
+from pathlib import Path
+from subprocess import check_output, call
+from lxml import etree
+
+
 def vmobj(vmservice, vm_name):
     """Search for vm by name and return vm object
     Parameters:
@@ -13,7 +21,7 @@ def vmobj(vmservice, vm_name):
     return data_vm
 
 
-def send_events(e_service, e_id, types, data_vm, desc, message):
+def send_events(e_service, e_id, types, desc, message, data_vm=None):
     """Send events to manager for tasks
     Parameters:
         e_service: service for events
@@ -22,21 +30,30 @@ def send_events(e_service, e_id, types, data_vm, desc, message):
         data_vm: vm object
         desc: description of snapshot
     """
-    e_service.add(
-        event=types.Event(
-            vm=types.Vm(
-                id=data_vm.id,
+    if data_vm is not None:
+        e_service.add(
+            event=types.Event(
+                vm=types.Vm(
+                    id=data_vm.id,
+                ),
+                origin=desc,
+                severity=types.LogSeverity.NORMAL,
+                custom_id=e_id,
+                description=message,
             ),
-            origin=desc,
-            severity=types.LogSeverity.NORMAL,
-            custom_id=e_id,
-            description=message,
-        ),
-    )
+        )
+    else:
+        e_service.add(
+            event=types.Event(
+                origin=desc,
+                severity=types.LogSeverity.NORMAL,
+                custom_id=e_id,
+                description=message,
+            ),
+        )
 
 
 def createdir(path):
-    import os
     os.makedirs(path)
 
 
@@ -121,8 +138,6 @@ def disksattachments(attachments, logging, dbg, clickecho):
 
 
 def getdevices():
-    from subprocess import check_output
-
     disks = check_output(
         'lsblk -do NAME,TYPE |grep disk |grep -v [vsx]da|cut -d" " -f1|xargs', shell=True)
     disks = disks.strip()
@@ -132,8 +147,6 @@ def getdevices():
 
 
 def converttoqcow2(devices, path, dbg, logging, clickecho):
-    from subprocess import call
-
     for uuid, device in devices.items():
         logging.info('Converting uuid {}, device {}'.format(uuid, device))
         call(['qemu-img', 'convert', '-f', 'raw', '-O',
@@ -143,3 +156,22 @@ def converttoqcow2(devices, path, dbg, logging, clickecho):
                 'Converting uuid {}, device {}'.format(uuid, device))
             call(['qemu-img', 'convert', '-p', '-f', 'raw', '-O',
                   'qcow2', device, path + uuid + '.qcow2'])
+
+
+def getinfoqcow2(file, f_path):
+    disks_info = []
+
+    disks = Path(f_path).glob('**/*.qcow2')
+    for disk in disks:
+        output = check_output(
+            'qemu-img info --output json ' + str(disk), shell=True).decode(encoding='UTF-8')
+        py_object = json.loads(output)
+        disks_info.append(py_object)
+    return disks_info
+
+
+def ovf_parse(file):
+    with open(file) as f:
+        ovf_str = f.read()
+        ovf = etree.fromstring(bytes(ovf_str, encoding='utf8'))
+    return ovf, ovf_str
