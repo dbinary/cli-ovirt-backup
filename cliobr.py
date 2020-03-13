@@ -15,7 +15,7 @@ import helpers
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = 'backuprestore'
 Description = 'cli-ovirt-backup'
-VERSION = '0.5'
+VERSION = '0.5.2'
 
 
 def print_version(ctx, param, value):
@@ -52,7 +52,7 @@ def cli():
     '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-backup.log', show_default=True, help='path log file'
 )
 @click.option('--debug', '-d', is_flag=True, default=False, help='debug mode')
-@click.option('--archive', '-a', is_flag=True, default=True, help='archive backup')
+@click.option('--archive', '-a', is_flag=True, default=False, help='archive backup')
 def backup(username, password, ca, vmname, url, debug, backup_path, log, archive):
     logging.basicConfig(level=logging.DEBUG, format=FORMAT,
                         filename=log)
@@ -76,10 +76,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     # the audit log:
     events_service = system_service.events_service()
 
-    # In order to send events we need to also send unique integer ids. These
-    # should usually come from an external database, but in this example we
-    # will just generate them from the current time in seconds since Jan 1st
-    # 1970.
+    # id for event in virt manager
     event_id = int(time.time())
 
     # Get the reference to the service that manages the virtual machines:
@@ -95,9 +92,11 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     helpers.send_events(events_service, event_id,
                         types, Description, message, vm)
 
-    TIMESTAMP = ts.replace('.', '')
-    FILENAME = vm.name+'-'+TIMESTAMP
-    DIR_SAVE = backup_path+'/'+FILENAME
+    timestamp = ts.replace('.', '')
+    backup_path_obj = Path(backup_path)
+    backup_name_obj = Path(vmname + '-' + timestamp)
+    vm_backup_obj = backup_path_obj / backup_name_obj
+    vm_backup_absolute = vm_backup_obj.absolute().as_posix()
 
     logging.info(
         'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
@@ -105,7 +104,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     )
     if debug:
         click.echo(
-            'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vm.name, vm.id))
+            'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vmname, vm.id))
     vmAgent = helpers.vmobj(vms_service, AgentVM)
     logging.info(
         'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
@@ -113,17 +112,17 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     )
     if debug:
         click.echo(
-            'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vm.name, vm.id))
+            'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vmAgent.name, vmAgent.id))
 
-    helpers.createdir(DIR_SAVE)
-    logging.info('Creating directory {}.'.format(DIR_SAVE + '/'))
+    helpers.createdir(vm_backup_absolute)
+    logging.info('Creating directory {}.'.format(vm_backup_absolute))
     if debug:
-        click.echo('Creating directory {}.'.format(DIR_SAVE + '/'))
+        click.echo('Creating directory {}.'.format(vm_backup_absolute))
     # Find the services that manage the data and agent virtual machines:
     data_vm_service = vms_service.vm_service(vm.id)
     agent_vm_service = vms_service.vm_service(vmAgent.id)
 
-    ovf_file = helpers.writeconfig(vm, DIR_SAVE + '/')
+    ovf_file = helpers.writeconfig(vm, vm_backup_absolute + '/')
     logging.info('Wrote OVF to file \'{}\''.format(
         os.path.abspath(ovf_file)))
     if debug:
@@ -169,7 +168,8 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     for i in range(len(attachments)):
         devices[attachments[i].disk.id] = '/dev/' + block_devices[i]
 
-    helpers.converttoqcow2(devices, DIR_SAVE + '/', debug, logging, click)
+    helpers.converttoqcow2(devices, vm_backup_absolute +
+                           '/', debug, logging, click)
 
     for attach in attachments:
         attachment_service = attachments_service.attachment_service(attach.id)
@@ -191,12 +191,12 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
 
     if archive:
         logging.info('Archiving \'{}\' in \'{}.tar.gz\''.format(
-            FILENAME, FILENAME))
-        shutil.make_archive(FILENAME, 'gztar', backup_path)
-        shutil.rmtree(DIR_SAVE)
+            vm_backup_absolute, vm_backup_absolute))
+        helpers.make_archive(vm_backup_absolute)
+        shutil.rmtree(vm_backup_absolute)
         if debug:
             click.echo('Archiving \'{}\' in \'{}.tar.gz\''.format(
-                FILENAME, FILENAME))
+                vm_backup_absolute, vm_backup_absolute))
     event_id += 1
     message = (
         'Backup of virtual machine \'{}\' using snapshot \'{}\' is '

@@ -1,8 +1,9 @@
-import os
-import shutil
 import json
+import os
+import tarfile
 from pathlib import Path
-from subprocess import check_output, call
+from subprocess import call, check_output
+
 from lxml import etree
 
 
@@ -175,3 +176,10 @@ def ovf_parse(file):
         ovf_str = f.read()
         ovf = etree.fromstring(bytes(ovf_str, encoding='utf8'))
     return ovf, ovf_str
+
+
+def make_archive(destination):
+    tar_name = destination + '.tar.gz'
+    tar = tarfile.open(tar_name, "w:gz")
+    tar.add(tar_name)
+    tar.close()
