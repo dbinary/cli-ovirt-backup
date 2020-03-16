@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import tarfile
 from pathlib import Path
 from subprocess import call, check_output
@@ -80,18 +81,18 @@ def createsnapshot(s_service, types, snap_description):
     return snap
 
 
-def waitingsnapshot(snap, types, logging, time, s_service, clickecho, dbg):
+def waitingsnapshot(snap, types, logging, time, s_service, clickecho, dbg, e_id):
     while snap.snapshot_status != types.SnapshotStatus.OK:
         logging.info(
-            'Waiting till the snapshot is created, the satus is \'{}\'.'.format(snap.snapshot_status))
+            '[{}] Waiting till the snapshot is created, the satus is \'{}\'.'.format(e_id, snap.snapshot_status))
         if dbg:
-            clickecho.echo('Waiting till the snapshot is created, the satus is \'{}\'.'.format(
-                snap.snapshot_status))
+            clickecho.echo('[{}] Waiting till the snapshot is created, the satus is \'{}\'.'.format(e_id,
+                                                                                                    snap.snapshot_status))
         time.sleep(10)
         snap = s_service.get()
-    logging.info('The snapshot is now complete.')
+    logging.info('[{}] The snapshot is now complete.'.format(e_id))
     if dbg:
-        clickecho.echo('The snapshot is now complete.')
+        clickecho.echo('[{}] The snapshot is now complete.'.format(e_id))
 
 
 def populateattachments(s_disks, snap, a_service, types, logging, clickecho, dbg):
@@ -155,8 +156,8 @@ def converttoqcow2(devices, path, dbg, logging, clickecho):
         if dbg:
             clickecho.echo(
                 'Converting uuid {}, device {}'.format(uuid, device))
-            call(['qemu-img', 'convert', '-p', '-f', 'raw', '-O',
-                  'qcow2', device, path + uuid + '.qcow2'])
+            call(['qemu-img', 'convert', '-p', '-f', 'raw',
+                  '-O', 'qcow2', device, path + uuid + '.qcow2'])
 
 
 def getinfoqcow2(file, f_path):
@@ -180,6 +181,12 @@ def ovf_parse(file):
 
 def make_archive(destination):
     tar_name = destination + '.tar.gz'
-    tar = tarfile.open(tar_name, "w:gz")
+    tar = tarfile.open(tar_name, 'w:gz')
     tar.add(tar_name)
+    tar.close()
+
+
+def unpack_archive(file, destination):
+    tar = tarfile.open(file)
+    tar.extractall(destination)
     tar.close()
