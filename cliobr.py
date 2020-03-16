@@ -1,9 +1,9 @@
 import logging
 import os
 import re
+import shutil
 import subprocess
 import time
-import shutil
 from pathlib import Path
 
 import click
@@ -26,7 +26,7 @@ def print_version(ctx, param, value):
 
 
 @click.group()
-@click.option('--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True)
+@click.option('--version', '-v', is_flag=True, callback=print_version, expose_value=False, is_eager=True)
 def cli():
     pass
 
@@ -43,7 +43,7 @@ def cli():
     '--ca', '-c', envvar='OVIRTCA', required=True, type=click.Path(), help='path for ca certificate of Manager'
 )
 @click.option(
-    '--url', '-U', envvar='OVIRTURL', required=True, help='url for oVirt API https://manager.example.com/ovirt-engine/api'
+    '--api', '-a', envvar='OVIRTURL', required=True, help='url for oVirt API https://manager.example.com/ovirt-engine/api'
 )
 @click.option(
     '--backup-path', '-b', envvar='BACKUPPATH', type=click.Path(), default='/ovirt-backup', show_default=True, help='path of backups'
@@ -52,12 +52,12 @@ def cli():
     '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-backup.log', show_default=True, help='path log file'
 )
 @click.option('--debug', '-d', is_flag=True, default=False, help='debug mode')
-@click.option('--archive', '-a', is_flag=True, default=False, help='archive backup')
-def backup(username, password, ca, vmname, url, debug, backup_path, log, archive):
+@click.option('--unarchive', '-n', is_flag=True, default=False, help='archive backup')
+def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchive):
     logging.basicConfig(level=logging.DEBUG, format=FORMAT,
                         filename=log)
     connection = sdk.Connection(
-        url=url,
+        url=api,
         username=username,
         password=password,
         ca_file=ca,
@@ -65,9 +65,12 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
         log=logging.getLogger(),
     )
 
-    logging.info('Connected to the server.')
+    # id for event in virt manager
+    event_id = int(time.time())
+
+    logging.info('[{}] Connected to the server.'.format(event_id))
     if debug:
-        click.echo('Connected to the server.')
+        click.echo('[{}] Connected to the server.'.format(event_id))
 
     # Get the reference to the root of the services tree:
     system_service = connection.system_service()
@@ -76,9 +79,6 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     # the audit log:
     events_service = system_service.events_service()
 
-    # id for event in virt manager
-    event_id = int(time.time())
-
     # Get the reference to the service that manages the virtual machines:
     vms_service = system_service.vms_service()
 
@@ -86,8 +86,8 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     ts = str(event_id)
 
     message = (
-        'Backup of virtual machine \'{}\' using snapshot \'{}\' is '
-        'starting.'.format(vm.name, Description)
+        '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
+        'starting.'.format(event_id, vm.name, Description)
     )
     helpers.send_events(events_service, event_id,
                         types, Description, message, vm)
@@ -99,48 +99,48 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     vm_backup_absolute = vm_backup_obj.absolute().as_posix()
 
     logging.info(
-        'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
-            vm.name, vm.id)
+        '[{}] Found data virtual machine \'{}\', the id is \'{}\'.'.format(
+            event_id, vm.name, vm.id)
     )
     if debug:
         click.echo(
-            'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vmname, vm.id))
+            '[{}] Found data virtual machine \'{}\', the id is \'{}\'.'.format(event_id, vmname, vm.id))
     vmAgent = helpers.vmobj(vms_service, AgentVM)
     logging.info(
-        'Found data virtual machine \'{}\', the id is \'{}\'.'.format(
-            vmAgent.name, vmAgent.id)
+        '[{}] Found agent virtual machine \'{}\', the id is \'{}\'.'.format(event_id,
+                                                                            vmAgent.name, vmAgent.id)
     )
     if debug:
         click.echo(
-            'Found data virtual machine \'{}\', the id is \'{}\'.'.format(vmAgent.name, vmAgent.id))
+            '[{}] Found agent virtual machine \'{}\', the id is \'{}\'.'.format(event_id, vmAgent.name, vmAgent.id))
 
     helpers.createdir(vm_backup_absolute)
-    logging.info('Creating directory {}.'.format(vm_backup_absolute))
+    logging.info('[{}] Creating directory {}.'.format(
+        event_id, vm_backup_absolute))
     if debug:
-        click.echo('Creating directory {}.'.format(vm_backup_absolute))
+        click.echo('[{}] Creating directory {}.'.format(
+            event_id, vm_backup_absolute))
     # Find the services that manage the data and agent virtual machines:
     data_vm_service = vms_service.vm_service(vm.id)
     agent_vm_service = vms_service.vm_service(vmAgent.id)
 
     ovf_file = helpers.writeconfig(vm, vm_backup_absolute + '/')
-    logging.info('Wrote OVF to file \'{}\''.format(
-        os.path.abspath(ovf_file)))
+    logging.info('[{}] Wrote OVF to file \'{}\''.format(event_id, ovf_file))
     if debug:
-        click.echo('Wrote OVF to file \'{}\''.format(
-            os.path.abspath(ovf_file)))
+        click.echo('[{}] Wrote OVF to file \'{}\''.format(event_id, ovf_file))
 
     snaps_service = data_vm_service.snapshots_service()
 
     snap = helpers.createsnapshot(snaps_service, types, Description)
-    logging.info('Sent request to create snapshot \'{}\', the id is \'{}\'.'.format(
-        snap.description, snap.id))
+    logging.info('[{}] Sent request to create snapshot \'{}\', the id is \'{}\'.'.format(
+        event_id, snap.description, snap.id))
     if debug:
-        click.echo('Sent request to create snapshot \'{}\', the id is \'{}\'.'.format(
-            snap.description, snap.id))
+        click.echo('[{}] Sent request to create snapshot \'{}\', the id is \'{}\'.'.format(
+            event_id, snap.description, snap.id))
 
     snap_service = snaps_service.snapshot_service(snap.id)
     helpers.waitingsnapshot(snap, types, logging, time,
-                            snap_service, click, debug)
+                            snap_service, click, debug, event_id)
 
     # Retrieve the descriptions of the disks of the snapshot:
     snap_disks_service = snap_service.disks_service()
@@ -154,13 +154,13 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
 
     for attach in attachments:
         logging.info(
-            'Attached disk \'{}\' to the agent virtual machine.'.format(
-                attach.disk.id)
+            '[{}] Attached disk \'{}\' to the agent virtual machine.'.format(
+                event_id, attach.disk.id)
         )
         if debug:
             click.echo(
-                'Attached disk \'{}\' to the agent virtual machine.'.format(
-                    attach.disk.id)
+                '[{}] Attached disk \'{}\' to the agent virtual machine.'.format(
+                    event_id, attach.disk.id)
             )
 
     block_devices = helpers.getdevices()
@@ -175,41 +175,42 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
         attachment_service = attachments_service.attachment_service(attach.id)
         attachment_service.remove()
         logging.info(
-            'Detached disk \'{}\' to from the agent virtual machine.'.format(
-                attach.disk.id)
-        )
+            '[{}] Detached disk \'{}\' to from the agent virtual machine.'.format(event_id, attach.disk.id))
         if debug:
             click.echo(
-                'Detached disk \'{}\' to from the agent virtual machine.'.format(
-                    attach.disk.id)
+                '[{}] Detached disk \'{}\' to from the agent virtual machine.'.format(
+                    event_id, attach.disk.id)
             )
     # Remove the snapshot:
     snap_service.remove()
-    logging.info('Removed the snapshot \'{}\'.'.format(snap.description))
+    logging.info('[{}] Removed the snapshot \'{}\'.'.format(
+        event_id, snap.description))
     if debug:
-        click.echo('Removed the snapshot \'{}\'.'.format(snap.description))
+        click.echo('[{}] Removed the snapshot \'{}\'.'.format(
+            event_id, snap.description))
 
-    if archive:
-        logging.info('Archiving \'{}\' in \'{}.tar.gz\''.format(
-            vm_backup_absolute, vm_backup_absolute))
+    if not unarchive:
+        logging.info('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
+            event_id, vm_backup_absolute, vm_backup_absolute))
+        # making archiving
         helpers.make_archive(vm_backup_absolute)
         shutil.rmtree(vm_backup_absolute)
         if debug:
-            click.echo('Archiving \'{}\' in \'{}.tar.gz\''.format(
-                vm_backup_absolute, vm_backup_absolute))
+            click.echo('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
+                event_id, vm_backup_absolute, vm_backup_absolute))
     event_id += 1
     message = (
-        'Backup of virtual machine \'{}\' using snapshot \'{}\' is '
-        'completed.'.format(vm.name, Description)
+        '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
+        'completed.'.format(event_id, vm.name, Description)
     )
     helpers.send_events(events_service, event_id,
                         types, Description, message, vm)
 
     # Finish the connection to the VM Manager
     connection.close()
-    logging.info('Disconnected to the server.')
+    logging.info('[{}] Disconnected to the server.'.format(event_id))
     if debug:
-        click.echo('Disconnected to the server.')
+        click.echo('[{}] Disconnected to the server.'.format(event_id))
 
 
 @cli.command()
@@ -224,7 +225,7 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     '--ca', '-c', envvar='OVIRTCA', required=True, type=click.Path(), help='path for ca certificate of Manager'
 )
 @click.option(
-    '--url', '-U', envvar='OVIRTURL', required=True, help='url for oVirt API https://manager.example.com/ovirt-engine/api'
+    '--api', '-a', envvar='OVIRTURL', required=True, help='url for oVirt API https://manager.example.com/ovirt-engine/api'
 )
 @click.option(
     '--storage-domain', '-s', envvar='OVIRTSD', required=True, help='Name of oVirt/RHV Storage Domain'
@@ -236,12 +237,12 @@ def backup(username, password, ca, vmname, url, debug, backup_path, log, archive
     '--log', '-l', envvar='OVIRTLOG', type=click.Path(), default='/var/log/cli-ovirt-restore.log', show_default=True, help='path log file'
 )
 @click.option('--debug', '-d', is_flag=True, default=False, help='debug mode')
-def restore(username, password, file, ca, url, storage_domain, log, debug, cluster):
+def restore(username, password, file, ca, api, storage_domain, log, debug, cluster):
 
     logging.basicConfig(level=logging.DEBUG, format=FORMAT,
                         filename=log)
     connection = sdk.Connection(
-        url=url,
+        url=api,
         username=username,
         password=password,
         ca_file=ca,
@@ -249,9 +250,12 @@ def restore(username, password, file, ca, url, storage_domain, log, debug, clust
         log=logging.getLogger(),
     )
 
-    logging.info('Connected to the server.')
+    # id for event in virt manager
+    event_id = int(time.time())
+
+    logging.info('[{}] Connected to the server.'.format(event_id))
     if debug:
-        click.echo('Connected to the server.')
+        click.echo('[{}] Connected to the server.'.format(event_id))
 
     # Get the reference to the root of the services tree:
     system_service = connection.system_service()
@@ -262,35 +266,23 @@ def restore(username, password, file, ca, url, storage_domain, log, debug, clust
 
     disks_service = system_service.disks_service()
 
-    # In order to send events we need to also send unique integer ids. These
-    # should usually come from an external database, but in this example we
-    # will just generate them from the current time in seconds since Jan 1st
-    # 1970.
-    event_id = int(time.time())
-
     p = Path(file)
 
     # Get absolute path of restore file
-    abs_path = p.absolute().as_posix()
+    tar_file = p.absolute().as_posix()
     # Get full path of parent
     parent_path = p.absolute().parent.as_posix()
-    tar_file = p.name
-    suffixes = len(p.suffixes)
-    basedir = ''
+
+    basedir = tar_file.split('.', 2)[0]
     xml_file = ''
 
-    # Getting name of extracted directory
-    for idx in range(suffixes):
-        if idx < suffixes:
-            basedir_tmp = Path(abs_path).stem
-        if idx == suffixes:
-            basedir = Path(basedir_tmp).stem
+    basedir_obj = Path(basedir)
 
-    vm_name = re.sub("\-.*$", '', tar_file)
+    vm_name = re.sub(r"\-.*$", '', tar_file)
 
     message = (
-        'Restore of virtual machine \'{}\' using file \'{}\' is '
-        'starting.'.format(vm_name, file)
+        '[{}] Restore of virtual machine \'{}\' using file \'{}\' is '
+        'starting.'.format(event_id, vm_name, tar_file)
     )
 
     logging.info(message)
@@ -299,21 +291,34 @@ def restore(username, password, file, ca, url, storage_domain, log, debug, clust
 
     helpers.send_events(events_service, event_id,
                         types, Description, message)
-
-    if abs_path.endswith('.gz'):
-        if not Path(basedir).exists():
-            logging.info('Init descompress')
-            if debug:
-                click.echo('Init descompress')
-            shutil.unpack_archive(file, parent_path, 'gztar')
-            logging.info('Finish decompress')
-            if debug:
-                click.echo('Finish decompress')
+    logging.info(basedir)
+    if not basedir_obj.exists():
+        logging.info("[{}] File {} is compressed".format(event_id, tar_file))
+        if debug:
+            click.echo("[{}] File {} is compressed".format(event_id, tar_file))
+        # Getting name of extracted directory
+        logging.info('[{}] Init descompress'.format(event_id))
+        if debug:
+            click.echo('[{}] Init descompress'.format(event_id))
+        #helpers.unpack_archive(tar_file, basedir_obj)
+        helpers.unpack_archive(tar_file, parent_path)
+        logging.info('[{}] Finish decompress'.format(event_id))
+        if debug:
+            click.echo('[{}] Finish decompress'.format(event_id))
 
     # Get the reference to the service that manages the virtual machines:
     vms_service = system_service.vms_service()
-    for f in Path(basedir).glob('**/*.ovf'):
-        xml_file = Path(f).absolute().as_posix()
+    if basedir_obj.exists():
+        for f in basedir_obj.glob('**/*.ovf'):
+            xml_file = Path(f).absolute().as_posix()
+        logging.info('[{}] Configuration file is [{}]'.format(
+            event_id, xml_file))
+        if debug:
+            click.echo('[{}] Configuration file is [{}]'.format(
+                event_id, xml_file))
+    else:
+        logging.info('failed to decompress')
+        exit(1)
 
     ovf, ovf_str = helpers.ovf_parse(xml_file)
 
