@@ -1,8 +1,9 @@
+import json
 import os
 import shutil
-import json
+import tarfile
 from pathlib import Path
-from subprocess import check_output, call
+from subprocess import call, check_output
 from lxml import etree
 
 
@@ -14,6 +15,7 @@ def vmobj(vmservice, vm_name):
     Returns:
         data_vm: object of vm
     """
+
     data_vm = vmservice.list(
         search='name=%s' % vm_name,
         all_content=True,
@@ -79,18 +81,18 @@ def createsnapshot(s_service, types, snap_description):
     return snap
 
 
-def waitingsnapshot(snap, types, logging, time, s_service, clickecho, dbg):
+def waitingsnapshot(snap, types, logging, time, s_service, clickecho, dbg, e_id):
     while snap.snapshot_status != types.SnapshotStatus.OK:
         logging.info(
-            'Waiting till the snapshot is created, the satus is \'{}\'.'.format(snap.snapshot_status))
+            '[{}] Waiting till the snapshot is created, the satus is \'{}\'.'.format(e_id, snap.snapshot_status))
         if dbg:
-            clickecho.echo('Waiting till the snapshot is created, the satus is \'{}\'.'.format(
-                snap.snapshot_status))
+            clickecho.echo('[{}] Waiting till the snapshot is created, the satus is \'{}\'.'.format(e_id,
+                                                                                                    snap.snapshot_status))
         time.sleep(10)
         snap = s_service.get()
-    logging.info('The snapshot is now complete.')
+    logging.info('[{}] The snapshot is now complete.'.format(e_id))
     if dbg:
-        clickecho.echo('The snapshot is now complete.')
+        clickecho.echo('[{}] The snapshot is now complete.'.format(e_id))
 
 
 def populateattachments(s_disks, snap, a_service, types, logging, clickecho, dbg):
@@ -154,8 +156,8 @@ def converttoqcow2(devices, path, dbg, logging, clickecho):
         if dbg:
             clickecho.echo(
                 'Converting uuid {}, device {}'.format(uuid, device))
-            call(['qemu-img', 'convert', '-p', '-f', 'raw', '-O',
-                  'qcow2', device, path + uuid + '.qcow2'])
+            call(['qemu-img', 'convert', '-p', '-f', 'raw',
+                  '-O', 'qcow2', device, path + uuid + '.qcow2'])
 
 
 def getinfoqcow2(file, f_path):
@@ -175,3 +177,18 @@ def ovf_parse(file):
         ovf_str = f.read()
         ovf = etree.fromstring(bytes(ovf_str, encoding='utf8'))
     return ovf, ovf_str
+
+
+def make_archive(workingdir, destination):
+    os.chdir(workingdir)
+    tar_name = destination + '.tar.gz'
+    tar = tarfile.open(tar_name, 'w:gz')
+    tmp_dir = Path(destination).name
+    tar.add(tmp_dir)
+    tar.close()
+
+
+def unpack_archive(file, destination):
+    tar = tarfile.open(file)
+    tar.extractall(destination)
+    tar.close()
