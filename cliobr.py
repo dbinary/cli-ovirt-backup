@@ -92,7 +92,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     helpers.send_events(events_service, event_id,
                         types, Description, message, vm)
 
-    timestamp = ts.replace('.', '')
+    timestamp = time.strftime("%Y%m%d%H%M%S")
     backup_path_obj = Path(backup_path)
     backup_name_obj = Path(vmname + '-' + timestamp)
     vm_backup_obj = backup_path_obj / backup_name_obj
@@ -193,7 +193,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
         logging.info('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
             event_id, vm_backup_absolute, vm_backup_absolute))
         # making archiving
-        helpers.make_archive(vm_backup_absolute)
+        helpers.make_archive(backup_path, vm_backup_absolute)
         shutil.rmtree(vm_backup_absolute)
         if debug:
             click.echo('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
@@ -266,11 +266,13 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
 
     disks_service = system_service.disks_service()
 
+    vms_service = system_service.vms_service()
+
     p = Path(file)
 
-    # Get absolute path of restore file
+    # Get absolute path of restore "file" variable
     tar_file = p.absolute().as_posix()
-    # Get full path of parent
+    # Get full path of parent related to "file" variable
     parent_path = p.absolute().parent.as_posix()
 
     basedir = tar_file.split('.', 2)[0]
@@ -278,7 +280,13 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
 
     basedir_obj = Path(basedir)
 
-    vm_name = re.sub(r"\-.*$", '', tar_file)
+    vm_name = re.sub(r"\-.*$", '', basedir_obj.name)
+
+    vm = helpers.vmobj(vms_service, vm_name)
+    if vm:
+        logging.info('[{}] vm {} alredy exists'.format(event_id, vm_name))
+        if debug:
+            click.echo('[{}] vm {} alredy exists'.format(event_id, vm_name))
 
     message = (
         '[{}] Restore of virtual machine \'{}\' using file \'{}\' is '
@@ -291,7 +299,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
 
     helpers.send_events(events_service, event_id,
                         types, Description, message)
-    logging.info(basedir)
+
     if not basedir_obj.exists():
         logging.info("[{}] File {} is compressed".format(event_id, tar_file))
         if debug:
@@ -330,9 +338,9 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     elements = ["boot", "volume-format", "diskId",
                 "disk-alias", "disk-description", "size", "fileRef"]
 
-    logging.info('Extracting ovf data')
+    logging.info('[{}] Extracting ovf data'.format(event_id))
     if debug:
-        click.echo('Extracting ovf data')
+        click.echo('[{}] Extracting ovf data'.format(event_id))
     for disk in ovf.iter('Disk'):
         for element in elements:
             if element == 'size':
@@ -346,15 +354,16 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
                 metas[str(element)] = disk.get(namespace+element)
         metadata.append(metas.copy())
 
-    logging.info('Defining disks')
+    logging.info('[{}] Defining disks'.format(event_id))
     if debug:
-        click.echo('Defining disks')
+        click.echo('[{}] Defining disks'.format(event_id))
     for meta in metadata:
-        logging.info('Defining disk {} with image {} and size {}'.format(
-            meta['fileRef'], meta['fileRef_image'], meta['size']))
+        logging.info('[{}] Defining disk {} with image {} and size {}'.format(event_id,
+                                                                              meta['fileRef'], meta['fileRef_image'], meta['size']))
 
         if debug:
-            click.echo('Defining disk {}'.format(meta['fileRef']))
+            click.echo('[{}] Defining disk {}'.format(
+                event_id, meta['fileRef']))
         if meta['volume-format'] == 'COW':
             disk_format = types.DiskFormat.COW
         else:
@@ -379,11 +388,11 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         disk_service = disks_service.disk_service(new_disk.id)
         while disk_service.get().status != types.DiskStatus.OK:
             time.sleep(5)
-            logging.info('Waiting till the disk is created, the satus is \'{}\'.'.format(
-                disk_service.get().status))
+            logging.info('[{}] Waiting till the disk is created, the satus is \'{}\'.'.format(event_id,
+                                                                                              disk_service.get().status))
             if debug:
-                click.echo('Waiting till the disk is created, the satus is \'{}\'.'.format(
-                    disk_service.get().status))
+                click.echo('[{}] Waiting till the disk is created, the satus is \'{}\'.'.format(event_id,
+                                                                                                disk_service.get().status))
         disks.append(new_disk)
 
     vm = vms_service.add(
@@ -400,6 +409,6 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         ),
     )
 
-    logging.info('Restore of vm: {} complete'.format(vm.name))
+    logging.info('[{}] Restore of vm: {} complete'.format(event_id, vm.name))
     if debug:
-        click.echo('Restore of vm: {} complete'.format(vm.name))
+        click.echo('[{}] Restore of vm: {} complete'.format(event_id, vm.name))

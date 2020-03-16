@@ -4,7 +4,6 @@ import shutil
 import tarfile
 from pathlib import Path
 from subprocess import call, check_output
-
 from lxml import etree
 
 
@@ -16,6 +15,7 @@ def vmobj(vmservice, vm_name):
     Returns:
         data_vm: object of vm
     """
+
     data_vm = vmservice.list(
         search='name=%s' % vm_name,
         all_content=True,
@@ -179,10 +179,12 @@ def ovf_parse(file):
     return ovf, ovf_str
 
 
-def make_archive(destination):
+def make_archive(workingdir, destination):
+    os.chdir(workingdir)
     tar_name = destination + '.tar.gz'
     tar = tarfile.open(tar_name, 'w:gz')
-    tar.add(tar_name)
+    tmp_dir = Path(destination).name
+    tar.add(tmp_dir)
     tar.close()
 
 
