@@ -15,7 +15,6 @@ def vmobj(vmservice, vm_name):
     Returns:
         data_vm: object of vm
     """
-
     data_vm = vmservice.list(
         search='name=%s' % vm_name,
         all_content=True,
@@ -186,9 +185,22 @@ def make_archive(workingdir, destination):
     tmp_dir = Path(destination).name
     tar.add(tmp_dir)
     tar.close()
+    shutil.rmtree(destination)
 
 
 def unpack_archive(file, destination):
     tar = tarfile.open(file)
     tar.extractall(destination)
     tar.close()
+
+
+def converttorestore(devices, path, dbg, logging, clickecho, formatdest):
+    for uuid, device in devices.items():
+        logging.info('Converting uuid {}, device {}'.format(uuid, device))
+        call(['qemu-img', 'convert', '-f', 'qcow2', '-O',
+              formatdest, path, device])
+        if dbg:
+            clickecho.echo(
+                'Converting uuid {}, device {}'.format(uuid, device))
+            call(['qemu-img', 'convert', '-p', '-f', 'qcow2',
+                  '-O', formatdest, path, device])
