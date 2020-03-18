@@ -83,7 +83,6 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     vms_service = system_service.vms_service()
 
     vm = helpers.vmobj(vms_service, vmname)
-    ts = str(event_id)
 
     message = (
         '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
