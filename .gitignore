@@ -129,3 +129,5 @@ ca.pem
 test.py
 .scannerwork/
 *.tar.gz
+
+api.http

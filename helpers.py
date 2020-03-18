@@ -15,7 +15,6 @@ def vmobj(vmservice, vm_name):
     Returns:
         data_vm: object of vm
     """
-
     data_vm = vmservice.list(
         search='name=%s' % vm_name,
         all_content=True,
@@ -84,10 +83,10 @@ def createsnapshot(s_service, types, snap_description):
 def waitingsnapshot(snap, types, logging, time, s_service, clickecho, dbg, e_id):
     while snap.snapshot_status != types.SnapshotStatus.OK:
         logging.info(
-            '[{}] Waiting till the snapshot is created, the satus is \'{}\'.'.format(e_id, snap.snapshot_status))
+            '[{}] Waiting till the snapshot is created, the status is \'{}\'.'.format(e_id, snap.snapshot_status))
         if dbg:
-            clickecho.echo('[{}] Waiting till the snapshot is created, the satus is \'{}\'.'.format(e_id,
-                                                                                                    snap.snapshot_status))
+            clickecho.echo('[{}] Waiting till the snapshot is created, the status is \'{}\'.'.format(e_id,
+                                                                                                     snap.snapshot_status))
         time.sleep(10)
         snap = s_service.get()
     logging.info('[{}] The snapshot is now complete.'.format(e_id))
@@ -151,13 +150,12 @@ def getdevices():
 def converttoqcow2(devices, path, dbg, logging, clickecho):
     for uuid, device in devices.items():
         logging.info('Converting uuid {}, device {}'.format(uuid, device))
-        call(['qemu-img', 'convert', '-f', 'raw', '-O',
-              'qcow2', device, path + uuid + '.qcow2'])
+        call(['qemu-img', 'convert', '-O', 'raw', device, path + uuid + '.raw'])
         if dbg:
             clickecho.echo(
                 'Converting uuid {}, device {}'.format(uuid, device))
-            call(['qemu-img', 'convert', '-p', '-f', 'raw',
-                  '-O', 'qcow2', device, path + uuid + '.qcow2'])
+            call(['qemu-img', 'convert', '-p', '-O',
+                  'raw', device, path + uuid + '.raw'])
 
 
 def getinfoqcow2(file, f_path):
@@ -182,13 +180,27 @@ def ovf_parse(file):
 def make_archive(workingdir, destination):
     os.chdir(workingdir)
     tar_name = destination + '.tar.gz'
-    tar = tarfile.open(tar_name, 'w:gz')
+    tar = tarfile.open(tar_name, 'w:gz', format=tarfile.GNU_FORMAT)
     tmp_dir = Path(destination).name
     tar.add(tmp_dir)
     tar.close()
+    shutil.rmtree(destination)
 
 
 def unpack_archive(file, destination):
-    tar = tarfile.open(file)
+    tar = tarfile.open(file, format=tarfile.GNU_FORMAT)
     tar.extractall(destination)
     tar.close()
+
+
+def converttorestore(event_id, devices, path, dbg, logging, clickecho):
+    for uuid, device in devices.items():
+        logging.info('[{}] Converting uuid {}, device {}'.format(
+            event_id, uuid, device))
+        logging.info('[{}] dd if={} of={} bs=8M conv=sparse'.format(
+            event_id, path, device))
+        call(['dd', 'if=' + path, 'of='+device, 'bs=8M', 'conv=sparse'])
+        if dbg:
+            clickecho.echo(
+                '[{}] Converting uuid {}, device {}'.format(event_id, uuid, device))
+            #call(['dd', 'if=' + path, 'of=' + device, 'bs=8M'])

@@ -15,7 +15,7 @@ import helpers
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = 'backuprestore'
 Description = 'cli-ovirt-backup'
-VERSION = '0.5.2'
+VERSION = '0.6'
 
 
 def print_version(ctx, param, value):
@@ -83,7 +83,6 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     vms_service = system_service.vms_service()
 
     vm = helpers.vmobj(vms_service, vmname)
-    ts = str(event_id)
 
     message = (
         '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
@@ -194,7 +193,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
             event_id, vm_backup_absolute, vm_backup_absolute))
         # making archiving
         helpers.make_archive(backup_path, vm_backup_absolute)
-        shutil.rmtree(vm_backup_absolute)
+
         if debug:
             click.echo('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
                 event_id, vm_backup_absolute, vm_backup_absolute))
@@ -249,6 +248,23 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         debug=debug,
         log=logging.getLogger(),
     )
+    # oVirt Services API
+    #
+    #
+    #
+    #
+    # Get the reference to the root of the services tree:
+    system_service = connection.system_service()
+
+    # Get the reference to the service that we will use to send events to
+    # the audit log:
+    events_service = system_service.events_service()
+    # Get the reference to the disks services:
+    disks_service = system_service.disks_service()
+    # Get the reference to the service that manages the virtual machines:
+    vms_service = system_service.vms_service()
+
+    vmAgent = helpers.vmobj(vms_service, AgentVM)
 
     # id for event in virt manager
     event_id = int(time.time())
@@ -256,17 +272,6 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     logging.info('[{}] Connected to the server.'.format(event_id))
     if debug:
         click.echo('[{}] Connected to the server.'.format(event_id))
-
-    # Get the reference to the root of the services tree:
-    system_service = connection.system_service()
-
-    # Get the reference to the service that we will use to send events to
-    # the audit log:
-    events_service = system_service.events_service()
-
-    disks_service = system_service.disks_service()
-
-    vms_service = system_service.vms_service()
 
     p = Path(file)
 
@@ -281,12 +286,6 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     basedir_obj = Path(basedir)
 
     vm_name = re.sub(r"\-.*$", '', basedir_obj.name)
-
-    vm = helpers.vmobj(vms_service, vm_name)
-    if vm:
-        logging.info('[{}] vm {} alredy exists'.format(event_id, vm_name))
-        if debug:
-            click.echo('[{}] vm {} alredy exists'.format(event_id, vm_name))
 
     message = (
         '[{}] Restore of virtual machine \'{}\' using file \'{}\' is '
@@ -314,8 +313,8 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         if debug:
             click.echo('[{}] Finish decompress'.format(event_id))
 
-    # Get the reference to the service that manages the virtual machines:
-    vms_service = system_service.vms_service()
+    qcow_disks = []
+
     if basedir_obj.exists():
         for f in basedir_obj.glob('**/*.ovf'):
             xml_file = Path(f).absolute().as_posix()
@@ -324,13 +323,15 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         if debug:
             click.echo('[{}] Configuration file is [{}]'.format(
                 event_id, xml_file))
+        for qcow in basedir_obj.glob('**/*.raw'):
+            qcow_disks.append(qcow.absolute().as_posix())
     else:
         logging.info('failed to decompress')
         exit(1)
 
     ovf, ovf_str = helpers.ovf_parse(xml_file)
 
-    disks = []
+    disks = []  # disks attachments
     namespace = '{http://schemas.dmtf.org/ovf/envelope/1/}'
 
     metadata = []
@@ -395,6 +396,68 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
                                                                                                 disk_service.get().status))
         disks.append(new_disk)
 
+    # Init copy data process
+    #data_vm_service = vms_service.vm_service(vm.id)
+    agent_vm_service = vms_service.vm_service(vmAgent.id)
+    # Attach disk service
+    agent_disks_attachment = agent_vm_service.disk_attachments_service()
+    attachments = []
+    for disk in disks:
+        attach = agent_disks_attachment.add(
+            attachment=types.DiskAttachment(
+                disk=types.Disk(
+                    id=disk.id
+                ),
+                active=True,
+                bootable=False,
+                interface=types.DiskInterface.VIRTIO,
+            ),
+        )
+        attachments.append(attach)
+        logging.info(
+            '[{}] Attached disk \'{}\' to the agent virtual machine.'.format(
+                event_id, attach.disk.id)
+        )
+        if debug:
+            click.echo(
+                '[{}] Attached disk \'{}\' to the agent virtual machine.'.format(
+                    event_id, attach.disk.id)
+            )
+
+    block_devices = helpers.getdevices()
+    devices = {}
+    for i in range(len(disks)):
+        devices[disks[i].id] = '/dev/' + block_devices[i]
+
+    qcow2_format = []
+    for meta in metadata:
+        if meta['volume-format'] == 'COW':
+            qcow2_format.append('qcow2')
+        else:
+            qcow2_format.append('raw')
+
+    logging.info(qcow_disks)
+    logging.info(print(len(qcow_disks)))
+
+    if len(qcow_disks) == 1:
+        helpers.converttorestore(event_id,
+                                 devices, qcow_disks[0], debug, logging, click)
+    else:
+        for i in range(len(qcow_disks)):
+            helpers.converttorestore(event_id,
+                                     devices, qcow_disks[i], debug, logging, click)
+
+    for attach in attachments:
+        attachment_service = agent_disks_attachment.attachment_service(
+            attach.id)
+        attachment_service.remove()
+        logging.info(
+            '[{}] Detached disk \'{}\' to from the agent virtual machine.'.format(event_id, attach.disk.id))
+        if debug:
+            click.echo(
+                '[{}] Detached disk \'{}\' to from the agent virtual machine.'.format(
+                    event_id, attach.disk.id)
+            )
     vm = vms_service.add(
         types.Vm(
             cluster=types.Cluster(
