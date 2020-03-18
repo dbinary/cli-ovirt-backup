@@ -439,12 +439,11 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
 
     if len(qcow_disks) == 1:
         helpers.converttorestore(
-            devices, qcow_disks[0], debug, logging, click, qcow2_format[0])
+            devices, qcow_disks[0], debug, logging, click, 'raw')
     else:
         for i in range(len(qcow_disks)):
-            print(qcow_disks[i])
             helpers.converttorestore(
-                devices, qcow_disks[i], debug, logging, click, qcow2_format[i])
+                devices, qcow_disks[i], debug, logging, click, 'raw')
 
     for attach in attachments:
         attachment_service = agent_disks_attachment.attachment_service(
