@@ -323,7 +323,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         if debug:
             click.echo('[{}] Configuration file is [{}]'.format(
                 event_id, xml_file))
-        for qcow in basedir_obj.glob('**/*.qcow2'):
+        for qcow in basedir_obj.glob('**/*.raw'):
             qcow_disks.append(qcow.absolute().as_posix())
     else:
         logging.info('failed to decompress')
@@ -436,13 +436,16 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         else:
             qcow2_format.append('raw')
 
+    logging.info(qcow_disks)
+    logging.info(print(len(qcow_disks)))
+
     if len(qcow_disks) == 1:
-        helpers.converttorestore(
-            devices, qcow_disks[0], debug, logging, click, 'raw')
+        helpers.converttorestore(event_id,
+                                 devices, qcow_disks[0], debug, logging, click)
     else:
         for i in range(len(qcow_disks)):
-            helpers.converttorestore(
-                devices, qcow_disks[i], debug, logging, click, 'raw')
+            helpers.converttorestore(event_id,
+                                     devices, qcow_disks[i], debug, logging, click)
 
     for attach in attachments:
         attachment_service = agent_disks_attachment.attachment_service(
