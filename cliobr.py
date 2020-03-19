@@ -15,7 +15,7 @@ import helpers
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = 'backuprestore'
 Description = 'cli-ovirt-backup'
-VERSION = '0.6'
+VERSION = '0.7'
 
 
 def print_version(ctx, param, value):
@@ -162,13 +162,13 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
                     event_id, attach.disk.id)
             )
 
-    block_devices = helpers.getdevices()
     devices = {}
     for i in range(len(attachments)):
-        devices[attachments[i].disk.id] = '/dev/' + block_devices[i]
+        devices[attachments[i].disk.id] = '/dev/backup/' + \
+            attachments[i].disk.id
 
-    helpers.converttoqcow2(devices, vm_backup_absolute +
-                           '/', debug, logging, click)
+    helpers.qemuconvert(event_id, devices,
+                        vm_backup_absolute + '/', debug, logging, click)
 
     for attach in attachments:
         attachment_service = attachments_service.attachment_service(attach.id)
@@ -192,7 +192,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
         logging.info('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
             event_id, vm_backup_absolute, vm_backup_absolute))
         # making archiving
-        helpers.make_archive(backup_path, vm_backup_absolute)
+        helpers.make_archive(backup_path, vm_backup_absolute, debug)
 
         if debug:
             click.echo('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
@@ -410,7 +410,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
                 ),
                 active=True,
                 bootable=False,
-                interface=types.DiskInterface.VIRTIO,
+                interface=types.DiskInterface.VIRTIO_SCSI,
             ),
         )
         attachments.append(attach)
@@ -424,10 +424,10 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
                     event_id, attach.disk.id)
             )
 
-    block_devices = helpers.getdevices()
     devices = {}
-    for i in range(len(disks)):
-        devices[disks[i].id] = '/dev/' + block_devices[i]
+    for i in range(len(attachments)):
+        devices[attachments[i].disk.id] = '/dev/backup/' + \
+            attachments[i].disk.id
 
     qcow2_format = []
     for meta in metadata:
@@ -435,9 +435,6 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
             qcow2_format.append('qcow2')
         else:
             qcow2_format.append('raw')
-
-    logging.info(qcow_disks)
-    logging.info(print(len(qcow_disks)))
 
     if len(qcow_disks) == 1:
         helpers.converttorestore(event_id,

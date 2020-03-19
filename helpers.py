@@ -5,6 +5,7 @@ import tarfile
 from pathlib import Path
 from subprocess import call, check_output
 from lxml import etree
+from time import sleep
 
 
 def vmobj(vmservice, vm_name):
@@ -107,7 +108,7 @@ def populateattachments(s_disks, snap, a_service, types, logging, clickecho, dbg
                 ),
                 active=True,
                 bootable=False,
-                interface=types.DiskInterface.VIRTIO,
+                interface=types.DiskInterface.VIRTIO_SCSI,
             ),
         )
         attachs.append(attachment)
@@ -158,16 +159,16 @@ def converttoqcow2(devices, path, dbg, logging, clickecho):
                   'raw', device, path + uuid + '.raw'])
 
 
-def getinfoqcow2(file, f_path):
-    disks_info = []
-
-    disks = Path(f_path).glob('**/*.qcow2')
-    for disk in disks:
-        output = check_output(
-            'qemu-img info --output json ' + str(disk), shell=True).decode(encoding='UTF-8')
-        py_object = json.loads(output)
-        disks_info.append(py_object)
-    return disks_info
+def qemuconvert(event_id, devices, path, dbg, logging, clickecho):
+    for uuid, device in devices.items():
+        logging.info('[{}] Converting uuid {}, device {}'.format(
+            event_id, uuid, device))
+        call(['qemu-img', 'convert', '-O', 'raw', device, path + uuid + '.raw'])
+        if dbg:
+            clickecho.echo(
+                '[{}] Converting uuid {}, device {}'.format(event_id, uuid, device))
+            call(['qemu-img', 'convert', '-p', '-O',
+                  'raw', device, path + uuid + '.raw'])
 
 
 def ovf_parse(file):
@@ -177,30 +178,32 @@ def ovf_parse(file):
     return ovf, ovf_str
 
 
-def make_archive(workingdir, destination):
+def make_archive(workingdir, destination, dbg):
     os.chdir(workingdir)
     tar_name = destination + '.tar.gz'
-    tar = tarfile.open(tar_name, 'w:gz', format=tarfile.GNU_FORMAT)
+    #tar = tarfile.open(name=tar_name, mode='w:gz', format='GNU_FORMAT')
     tmp_dir = Path(destination).name
-    tar.add(tmp_dir)
-    tar.close()
+    # tar.add(tmp_dir)
+    # tar.close()
+    call(['tar', '-czSf', tar_name, tmp_dir])
+    if dbg:
+        call(['tar', '-czvSf', tar_name, tmp_dir])
     shutil.rmtree(destination)
 
 
 def unpack_archive(file, destination):
-    tar = tarfile.open(file, format=tarfile.GNU_FORMAT)
+    tar = tarfile.open(file)
     tar.extractall(destination)
     tar.close()
 
 
 def converttorestore(event_id, devices, path, dbg, logging, clickecho):
     for uuid, device in devices.items():
+        logging.info('[{}] Waiting 10s for convert'.format(event_id))
         logging.info('[{}] Converting uuid {}, device {}'.format(
             event_id, uuid, device))
-        logging.info('[{}] dd if={} of={} bs=8M conv=sparse'.format(
-            event_id, path, device))
+        sleep(10)
         call(['dd', 'if=' + path, 'of='+device, 'bs=8M', 'conv=sparse'])
         if dbg:
             clickecho.echo(
                 '[{}] Converting uuid {}, device {}'.format(event_id, uuid, device))
-            #call(['dd', 'if=' + path, 'of=' + device, 'bs=8M'])
