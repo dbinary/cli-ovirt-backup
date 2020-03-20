@@ -1,11 +1,12 @@
 import json
 import os
 import shutil
+import subprocess
 import tarfile
 from pathlib import Path
-from subprocess import call, check_output
-from lxml import etree
 from time import sleep
+
+from lxml import etree
 
 
 def vmobj(vmservice, vm_name):
@@ -140,7 +141,7 @@ def disksattachments(attachments, logging, dbg, clickecho):
 
 
 def getdevices():
-    disks = check_output(
+    disks = subprocess.check_output(
         'lsblk -do NAME,TYPE |grep disk |grep -v [vsx]da|cut -d" " -f1|xargs', shell=True)
     disks = disks.strip()
     disks = disks.decode()
@@ -151,24 +152,26 @@ def getdevices():
 def converttoqcow2(devices, path, dbg, logging, clickecho):
     for uuid, device in devices.items():
         logging.info('Converting uuid {}, device {}'.format(uuid, device))
-        call(['qemu-img', 'convert', '-O', 'raw', device, path + uuid + '.raw'])
+        subprocess.call(['qemu-img', 'convert', '-O', 'raw',
+                         device, path + uuid + '.raw'])
         if dbg:
             clickecho.echo(
                 'Converting uuid {}, device {}'.format(uuid, device))
-            call(['qemu-img', 'convert', '-p', '-O',
-                  'raw', device, path + uuid + '.raw'])
+            subprocess.call(['qemu-img', 'convert', '-p', '-O',
+                             'raw', device, path + uuid + '.raw'])
 
 
 def qemuconvert(event_id, devices, path, dbg, logging, clickecho):
     for uuid, device in devices.items():
         logging.info('[{}] Converting uuid {}, device {}'.format(
             event_id, uuid, device))
-        call(['qemu-img', 'convert', '-O', 'raw', device, path + uuid + '.raw'])
+        subprocess.call(['qemu-img', 'convert', '-O', 'raw',
+                         device, path + uuid + '.raw'])
         if dbg:
             clickecho.echo(
                 '[{}] Converting uuid {}, device {}'.format(event_id, uuid, device))
-            call(['qemu-img', 'convert', '-p', '-O',
-                  'raw', device, path + uuid + '.raw'])
+            subprocess.call(['qemu-img', 'convert', '-p', '-O',
+                             'raw', device, path + uuid + '.raw'])
 
 
 def ovf_parse(file):
@@ -178,32 +181,40 @@ def ovf_parse(file):
     return ovf, ovf_str
 
 
-def make_archive(workingdir, destination, dbg):
-    os.chdir(workingdir)
-    tar_name = destination + '.tar.gz'
-    #tar = tarfile.open(name=tar_name, mode='w:gz', format='GNU_FORMAT')
-    tmp_dir = Path(destination).name
-    # tar.add(tmp_dir)
-    # tar.close()
-    call(['tar', '-czSf', tar_name, tmp_dir])
-    if dbg:
-        call(['tar', '-czvSf', tar_name, tmp_dir])
-    shutil.rmtree(destination)
-
-
-def unpack_archive(file, destination):
-    tar = tarfile.open(file)
-    tar.extractall(destination)
-    tar.close()
-
-
-def converttorestore(event_id, devices, path, dbg, logging, clickecho):
-    for uuid, device in devices.items():
-        logging.info('[{}] Waiting 10s for convert'.format(event_id))
-        logging.info('[{}] Converting uuid {}, device {}'.format(
-            event_id, uuid, device))
-        sleep(10)
-        call(['dd', 'if=' + path, 'of='+device, 'bs=8M', 'conv=sparse'])
+def make_archive(workingdir, destination, dbg, e_id, log):
+    try:
+        os.chdir(workingdir)
+        tar_name = destination + '.tar.gz'
+        tmp_dir = Path(destination).name
+        subprocess.call(['tar', '-czSf', tar_name, tmp_dir])
         if dbg:
-            clickecho.echo(
-                '[{}] Converting uuid {}, device {}'.format(event_id, uuid, device))
+            subprocess.call(['tar', '-czvSf', tar_name, tmp_dir])
+        shutil.rmtree(destination)
+    except (subprocess.SubprocessError, shutil.Error) as e:
+        log.error('[{}] Error unpacking file: {}'.format(e_id, e))
+
+
+def unpack_archive(file, destination, log, e_id):
+    try:
+        tar = tarfile.open(file)
+        tar.extractall(destination)
+        tar.close()
+    except tarfile.TarError as e:
+        log.error('[{}] Error unpacking file: {}'.format(e_id, e))
+
+
+def converttorestore(e_id, devices, path, dbg, log, clickecho):
+    try:
+        for uuid, device in devices.items():
+            log.info('[{}] Waiting 10s for convert'.format(e_id))
+            log.info('[{}] Converting uuid {}, device {}'.format(
+                e_id, uuid, device))
+            sleep(10)
+            subprocess.call(['dd', 'if=' + path, 'of=' +
+                             device, 'bs=8M', 'conv=sparse'])
+            if dbg:
+                clickecho.echo(
+                    '[{}] Converting uuid {}, device {}'.format(e_id, uuid, device))
+    except subprocess.SubprocessError as e:
+        log.error('[{}] Error unpacking file: {}'.format(e_id, e))
+        exit(2)

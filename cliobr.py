@@ -97,6 +97,11 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     vm_backup_obj = backup_path_obj / backup_name_obj
     vm_backup_absolute = vm_backup_obj.absolute().as_posix()
 
+    if not backup_name_obj.exists():
+        logging.error("[{}] Mount point {} not exists".format(
+            event_id, backup_name_obj.name))
+        exit(1)
+
     logging.info(
         '[{}] Found data virtual machine \'{}\', the id is \'{}\'.'.format(
             event_id, vm.name, vm.id)
@@ -166,9 +171,12 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     for i in range(len(attachments)):
         devices[attachments[i].disk.id] = '/dev/backup/' + \
             attachments[i].disk.id
-
-    helpers.qemuconvert(event_id, devices,
-                        vm_backup_absolute + '/', debug, logging, click)
+    try:
+        helpers.qemuconvert(event_id, devices,
+                            vm_backup_absolute + '/', debug, logging, click)
+    except subprocess.CalledProcessError as e:
+        logging.error('[{}] Error: {}'.format(event_id, e))
+        exit(2)
 
     for attach in attachments:
         attachment_service = attachments_service.attachment_service(attach.id)
@@ -192,7 +200,8 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
         logging.info('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
             event_id, vm_backup_absolute, vm_backup_absolute))
         # making archiving
-        helpers.make_archive(backup_path, vm_backup_absolute, debug)
+        helpers.make_archive(backup_path, vm_backup_absolute,
+                             debug, event_id, logging)
 
         if debug:
             click.echo('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
@@ -275,6 +284,11 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
 
     p = Path(file)
 
+    if not p.exists():
+        logging.error("[{}] File backup {} not exists".format(
+            event_id, p.name))
+        exit(1)
+
     # Get absolute path of restore "file" variable
     tar_file = p.absolute().as_posix()
     # Get full path of parent related to "file" variable
@@ -307,8 +321,9 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         logging.info('[{}] Init descompress'.format(event_id))
         if debug:
             click.echo('[{}] Init descompress'.format(event_id))
-        #helpers.unpack_archive(tar_file, basedir_obj)
-        helpers.unpack_archive(tar_file, parent_path)
+
+        helpers.unpack_archive(tar_file, parent_path, logging, event_id)
+
         logging.info('[{}] Finish decompress'.format(event_id))
         if debug:
             click.echo('[{}] Finish decompress'.format(event_id))
