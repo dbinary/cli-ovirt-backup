@@ -15,7 +15,8 @@ import helpers
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = 'backuprestore'
 Description = 'cli-ovirt-backup'
-VERSION = '0.7'
+VERSION = '0.8'
+ONERROR = 0
 
 
 def print_version(ctx, param, value):
@@ -97,6 +98,11 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     vm_backup_obj = backup_path_obj / backup_name_obj
     vm_backup_absolute = vm_backup_obj.absolute().as_posix()
 
+    if not backup_path_obj.exists():
+        logging.error("[{}] Mount point {} not exists".format(
+            event_id, backup_path_obj.name))
+        exit(1)
+
     logging.info(
         '[{}] Found data virtual machine \'{}\', the id is \'{}\'.'.format(
             event_id, vm.name, vm.id)
@@ -167,8 +173,8 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
         devices[attachments[i].disk.id] = '/dev/backup/' + \
             attachments[i].disk.id
 
-    helpers.qemuconvert(event_id, devices,
-                        vm_backup_absolute + '/', debug, logging, click)
+    ONERROR = helpers.qemuconvert(event_id, devices,
+                                  vm_backup_absolute + '/', debug, logging, click)
 
     for attach in attachments:
         attachment_service = attachments_service.attachment_service(attach.id)
@@ -192,7 +198,8 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
         logging.info('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
             event_id, vm_backup_absolute, vm_backup_absolute))
         # making archiving
-        helpers.make_archive(backup_path, vm_backup_absolute, debug)
+        ONERROR = helpers.make_archive(backup_path, vm_backup_absolute,
+                                       debug, event_id, logging)
 
         if debug:
             click.echo('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
@@ -210,6 +217,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     logging.info('[{}] Disconnected to the server.'.format(event_id))
     if debug:
         click.echo('[{}] Disconnected to the server.'.format(event_id))
+    exit(ONERROR)
 
 
 @cli.command()
@@ -275,6 +283,11 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
 
     p = Path(file)
 
+    if not p.exists():
+        logging.error("[{}] File backup {} not exists".format(
+            event_id, p.name))
+        exit(1)
+
     # Get absolute path of restore "file" variable
     tar_file = p.absolute().as_posix()
     # Get full path of parent related to "file" variable
@@ -307,8 +320,10 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         logging.info('[{}] Init descompress'.format(event_id))
         if debug:
             click.echo('[{}] Init descompress'.format(event_id))
-        #helpers.unpack_archive(tar_file, basedir_obj)
-        helpers.unpack_archive(tar_file, parent_path)
+
+        ONERROR = helpers.unpack_archive(
+            tar_file, parent_path, logging, event_id)
+
         logging.info('[{}] Finish decompress'.format(event_id))
         if debug:
             click.echo('[{}] Finish decompress'.format(event_id))
@@ -437,12 +452,12 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
             qcow2_format.append('raw')
 
     if len(qcow_disks) == 1:
-        helpers.converttorestore(event_id,
-                                 devices, qcow_disks[0], debug, logging, click)
+        ONERROR = helpers.converttorestore(event_id,
+                                           devices, qcow_disks[0], debug, logging, click)
     else:
         for i in range(len(qcow_disks)):
-            helpers.converttorestore(event_id,
-                                     devices, qcow_disks[i], debug, logging, click)
+            ONERROR = helpers.converttorestore(event_id,
+                                               devices, qcow_disks[i], debug, logging, click)
 
     for attach in attachments:
         attachment_service = agent_disks_attachment.attachment_service(
@@ -472,3 +487,4 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     logging.info('[{}] Restore of vm: {} complete'.format(event_id, vm.name))
     if debug:
         click.echo('[{}] Restore of vm: {} complete'.format(event_id, vm.name))
+    exit(ONERROR)
