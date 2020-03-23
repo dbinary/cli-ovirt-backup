@@ -163,15 +163,21 @@ def converttoqcow2(devices, path, dbg, logging, clickecho):
 
 def qemuconvert(event_id, devices, path, dbg, logging, clickecho):
     for uuid, device in devices.items():
-        logging.info('[{}] Converting uuid {}, device {}'.format(
-            event_id, uuid, device))
-        subprocess.call(['qemu-img', 'convert', '-O', 'raw',
-                         device, path + uuid + '.raw'])
+        sleep(10)
         if dbg:
             clickecho.echo(
                 '[{}] Converting uuid {}, device {}'.format(event_id, uuid, device))
-            subprocess.call(['qemu-img', 'convert', '-p', '-O',
-                             'raw', device, path + uuid + '.raw'])
+            command = subprocess.call(['qemu-img', 'convert', '-p', '-O',
+                                       'raw', device, path + uuid + '.raw'])
+        else:
+            logging.info('[{}] Converting uuid {}, device {}'.format(
+                event_id, uuid, device))
+            command = subprocess.call(['qemu-img', 'convert', '-O', 'raw',
+                                       device, path + uuid + '.raw'])
+        if command != 0:
+            logging.error(
+                '[{}] Error converting device: {} with return code: {}'.format(event_id, device, command))
+            return command
 
 
 def ovf_parse(file):
@@ -182,16 +188,18 @@ def ovf_parse(file):
 
 
 def make_archive(workingdir, destination, dbg, e_id, log):
-    try:
-        os.chdir(workingdir)
-        tar_name = destination + '.tar.gz'
-        tmp_dir = Path(destination).name
-        subprocess.call(['tar', '-czSf', tar_name, tmp_dir])
-        if dbg:
-            subprocess.call(['tar', '-czvSf', tar_name, tmp_dir])
-        shutil.rmtree(destination)
-    except (subprocess.SubprocessError, shutil.Error) as e:
-        log.error('[{}] Error unpacking file: {}'.format(e_id, e))
+    os.chdir(workingdir)
+    tar_name = destination + '.tar.gz'
+    tmp_dir = Path(destination).name
+    if dbg:
+        command = subprocess.call(['tar', '-czvSf', tar_name, tmp_dir])
+    else:
+        command = subprocess.call(['tar', '-czSf', tar_name, tmp_dir])
+    shutil.rmtree(destination)
+    if command != 0:
+        log.error(
+            '[{}] Error packing file with return code: {}'.format(e_id, command))
+        return command
 
 
 def unpack_archive(file, destination, log, e_id):
@@ -201,20 +209,21 @@ def unpack_archive(file, destination, log, e_id):
         tar.close()
     except tarfile.TarError as e:
         log.error('[{}] Error unpacking file: {}'.format(e_id, e))
+        return e
 
 
-def converttorestore(e_id, devices, path, dbg, log, clickecho):
-    try:
-        for uuid, device in devices.items():
-            log.info('[{}] Waiting 10s for convert'.format(e_id))
-            log.info('[{}] Converting uuid {}, device {}'.format(
-                e_id, uuid, device))
-            sleep(10)
-            subprocess.call(['dd', 'if=' + path, 'of=' +
-                             device, 'bs=8M', 'conv=sparse'])
-            if dbg:
-                clickecho.echo(
-                    '[{}] Converting uuid {}, device {}'.format(e_id, uuid, device))
-    except subprocess.SubprocessError as e:
-        log.error('[{}] Error unpacking file: {}'.format(e_id, e))
-        exit(2)
+def converttorestore(e_id, devices, path, dbg, log, clickecho, ):
+    for uuid, device in devices.items():
+        log.info('[{}] Waiting 10s for convert'.format(e_id))
+        log.info('[{}] Converting uuid {}, device {}'.format(
+            e_id, uuid, device))
+        sleep(10)
+        command = subprocess.call(['dd', 'if=' + path, 'of=' +
+                                   device, 'bs=8M', 'conv=sparse'])
+        if dbg:
+            clickecho.echo(
+                '[{}] Converting uuid {}, device {}'.format(e_id, uuid, device))
+        if command != 0:
+            log.error(
+                '[{}] Error unpacking file errcode: {}'.format(e_id, command))
+            return command
