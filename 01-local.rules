@@ -1,0 +1,4 @@
+# SCSI devices
+KERNEL=="sd*", ENV{ID_SCSI_SERIAL}!="?*", IMPORT{program}="scsi_id --export --whitelisted -d $devnode", ENV{ID_BUS}="scsi"
+KERNEL=="sd*", ENV{DEVTYPE}=="disk", ENV{ID_SCSI_SERIAL}=="?*", SYMLINK+="backup/$env{ID_SCSI_SERIAL}"
+KERNEL=="sd*", ENV{DEVTYPE}=="partition", ENV{ID_SCSI_SERIAL}=="?*", SYMLINK+="backup/$env{ID_SCSI_SERIAL}-part%n"
