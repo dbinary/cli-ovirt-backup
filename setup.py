@@ -6,7 +6,7 @@ setup(
     keywords=['backup', 'restore', 'ovirt', 'virtualization'],
     long_description='Script for backup and restore virtual machines in oVirt/RHV environment',
     name='cliobr',
-    version='0.8',
+    version='0.8.1',
     description='Script for backup and restore virtual machines in oVirt/RHV environment',
     py_modules=['cliobr', 'helpers'],
     license='MIT',
