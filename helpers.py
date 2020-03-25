@@ -140,27 +140,6 @@ def disksattachments(attachments, logging, dbg, clickecho):
     return diskarray
 
 
-def getdevices():
-    disks = subprocess.check_output(
-        'lsblk -do NAME,TYPE |grep disk |grep -v [vsx]da|cut -d" " -f1|xargs', shell=True)
-    disks = disks.strip()
-    disks = disks.decode()
-    disks = disks.split(' ')
-    return disks
-
-
-def converttoqcow2(devices, path, dbg, logging, clickecho):
-    for uuid, device in devices.items():
-        logging.info('Converting uuid {}, device {}'.format(uuid, device))
-        subprocess.call(['qemu-img', 'convert', '-O', 'raw',
-                         device, path + uuid + '.raw'])
-        if dbg:
-            clickecho.echo(
-                'Converting uuid {}, device {}'.format(uuid, device))
-            subprocess.call(['qemu-img', 'convert', '-p', '-O',
-                             'raw', device, path + uuid + '.raw'])
-
-
 def qemuconvert(event_id, devices, path, dbg, logging, clickecho):
     for uuid, device in devices.items():
         sleep(10)
@@ -212,18 +191,7 @@ def unpack_archive(file, destination, log, e_id):
         return e
 
 
-def converttorestore(e_id, devices, path, dbg, log, clickecho, ):
-    for uuid, device in devices.items():
-        log.info('[{}] Waiting 10s for convert'.format(e_id))
-        log.info('[{}] Converting uuid {}, device {}'.format(
-            e_id, uuid, device))
-        sleep(10)
-        command = subprocess.call(['dd', 'if=' + path, 'of=' +
-                                   device, 'bs=8M', 'conv=sparse'])
-        if dbg:
-            clickecho.echo(
-                '[{}] Converting uuid {}, device {}'.format(e_id, uuid, device))
-        if command != 0:
-            log.error(
-                '[{}] Error unpacking file errcode: {}'.format(e_id, command))
-            return command
+def restoredata(device, path):
+    command = subprocess.call(
+        ['dd', 'if=' + path, 'of=' + device, 'bs=8M', 'conv=sparse'])
+    return command

@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
+from time import sleep
 
 import click
 import ovirtsdk4 as sdk
@@ -205,13 +206,26 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
             click.echo('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
                 event_id, vm_backup_absolute, vm_backup_absolute))
     event_id += 1
-    message = (
-        '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
-        'completed.'.format(event_id, vm.name, Description)
-    )
-    helpers.send_events(events_service, event_id,
-                        types, Description, message, vm)
-
+    if ONERROR == 0:
+        message = (
+            '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
+            'completed.'.format(event_id, vm.name, Description)
+        )
+        helpers.send_events(events_service, event_id,
+                            types, Description, message, vm)
+        logging.info(message)
+        if debug:
+            click.echo(message)
+    else:
+        message = (
+            '[{}] Backup of virtual machine \'{}\' terminating with return code \'{}\''.format(
+                event_id, vm.name, ONERROR)
+        )
+        helpers.send_events(events_service, event_id,
+                            types, Description, message, vm)
+        logging.info(message)
+        if debug:
+            click.echo(message)
     # Finish the connection to the VM Manager
     connection.close()
     logging.info('[{}] Disconnected to the server.'.format(event_id))
@@ -412,7 +426,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         disks.append(new_disk)
 
     # Init copy data process
-    #data_vm_service = vms_service.vm_service(vm.id)
+    # data_vm_service = vms_service.vm_service(vm.id)
     agent_vm_service = vms_service.vm_service(vmAgent.id)
     # Attach disk service
     agent_disks_attachment = agent_vm_service.disk_attachments_service()
@@ -441,23 +455,22 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
 
     devices = {}
     for i in range(len(attachments)):
-        devices[attachments[i].disk.id] = '/dev/backup/' + \
-            attachments[i].disk.id
-
-    qcow2_format = []
-    for meta in metadata:
-        if meta['volume-format'] == 'COW':
-            qcow2_format.append('qcow2')
+        device = '/dev/backup/' + attachments[i].disk.id
+        fileqcow = qcow_disks[i]
+        if attachments[i].disk.id in fileqcow:
+            devices[fileqcow] = device
         else:
-            qcow2_format.append('raw')
+            i -= 1
 
-    if len(qcow_disks) == 1:
-        ONERROR = helpers.converttorestore(event_id,
-                                           devices, qcow_disks[0], debug, logging, click)
-    else:
-        for i in range(len(qcow_disks)):
-            ONERROR = helpers.converttorestore(event_id,
-                                               devices, qcow_disks[i], debug, logging, click)
+    for path, device in devices.items():
+        logging.info('[{}] Waiting 10s for convert'.format(event_id))
+        sleep(10)
+        logging.info('[{}] Converting file {}, device {}'.format(
+            event_id, path, device))
+        ONERROR = helpers.restoredata(device, path)
+        if ONERROR != 0:
+            logging.error(
+                '[{}] Error unpacking file errcode: {}'.format(event_id, ONERROR))
 
     for attach in attachments:
         attachment_service = agent_disks_attachment.attachment_service(
@@ -484,7 +497,20 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         ),
     )
 
-    logging.info('[{}] Restore of vm: {} complete'.format(event_id, vm.name))
-    if debug:
-        click.echo('[{}] Restore of vm: {} complete'.format(event_id, vm.name))
+    if ONERROR == 0:
+        message = ('[{}] Restore of virtual machine \'{}\' using file \'{}\' is completed.'.format(
+            event_id, vm_name, tar_file))
+        helpers.send_events(events_service, event_id,
+                            types, Description, message)
+        logging.info(message)
+        if debug:
+            click.echo(message)
+    else:
+        message = ('[{}] Restore of vm: {} terminate with return code \'{}\''.format(
+            event_id, vm.name, ONERROR))
+        helpers.send_events(events_service, event_id,
+                            types, Description, message)
+        logging.info(message)
+        if debug:
+            click.echo(message)
     exit(ONERROR)
