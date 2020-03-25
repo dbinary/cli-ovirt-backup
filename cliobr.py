@@ -396,8 +396,10 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
                 event_id, meta['fileRef']))
         if meta['volume-format'] == 'COW':
             disk_format = types.DiskFormat.COW
+            sparse = True
         else:
             disk_format = types.DiskFormat.RAW
+            sparse = False
         if meta['boot']:
             boot = True
         new_disk = disks_service.add(
@@ -411,7 +413,8 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
                     types.StorageDomain(name=storage_domain)
                 ],
                 bootable=boot,
-                image_id=meta['fileRef_image']
+                image_id=meta['fileRef_image'],
+                sparse=sparse
             )
         )
 
@@ -496,7 +499,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
             ),
         ),
     )
-
+    event_id += 1
     if ONERROR == 0:
         shutil.rmtree(basedir_obj.absolute().as_posix())
         message = ('[{}] Restore of virtual machine \'{}\' using file \'{}\' is completed.'.format(
