@@ -191,7 +191,11 @@ def unpack_archive(file, destination, log, e_id):
         return e
 
 
-def restoredata(device, path):
-    command = subprocess.call(
-        ['dd', 'if=' + path, 'of=' + device, 'bs=8M', 'conv=sparse'])
+def restoredata(device, path, dbg):
+    if dbg:
+        command = subprocess.call(
+            ['dd', 'if=' + path, 'of=' + device, 'bs=8M', 'conv=sparse'])
+    else:
+        command = subprocess.call(
+            ['dd', 'if=' + path, 'of=' + device, 'bs=8M', 'conv=sparse', 'status=none'])
     return command

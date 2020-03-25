@@ -467,7 +467,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         sleep(10)
         logging.info('[{}] Converting file {}, device {}'.format(
             event_id, path, device))
-        ONERROR = helpers.restoredata(device, path)
+        ONERROR = helpers.restoredata(device, path, debug)
         if ONERROR != 0:
             logging.error(
                 '[{}] Error unpacking file errcode: {}'.format(event_id, ONERROR))
@@ -498,6 +498,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     )
 
     if ONERROR == 0:
+        shutil.rmtree(basedir_obj.absolute().as_posix())
         message = ('[{}] Restore of virtual machine \'{}\' using file \'{}\' is completed.'.format(
             event_id, vm_name, tar_file))
         helpers.send_events(events_service, event_id,
