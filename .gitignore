@@ -131,3 +131,11 @@ test.py
 *.tar.gz
 
 api.http
+# Created by https://www.gitignore.io/api/ansible
+# Edit at https://www.gitignore.io/?templates=ansible
+
+### Ansible ###
+*.retry
+hosts
+
+# End of https://www.gitignore.io/api/ansible
