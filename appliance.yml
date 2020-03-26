@@ -1,0 +1,36 @@
+---
+- name: Install and Configure cli-ovirt-backup appliance
+  hosts: all
+  vars:
+    epel: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+    packages:
+      - python3
+    rhel_repositories:
+      - rhel-8-for-x86_64-baseos-rpms
+      - rhel-8-for-x86_64-appstream-rpms
+      - rhel-8-for-x86_64-supplementary-rpms
+      - codeready-builder-for-rhel-8-x86_64-rpms
+  tasks:
+    - name: Install epel repository
+      yum:
+        name: "{{ epel }}"
+        state: present
+    - name: Enable Red Hat Repositories
+      rhsm_repository:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ rhel_repositories }}"
+      when:
+        - ansible_facts['distribution_major_version'] == "8"
+        - ansible_facts['distribution']  == "RedHat"
+    - name: Activating PowerTools repository
+      command: "dnf config-manager --set-enabled PowerTools"
+      when:
+        - ansible_facts['distribution']  == "CentOS"
+        - ansible_facts['distribution_major_version'] == "8"
+    - name: Install required packages
+      yum:
+        name: "{{ packages }}"
+        state: present
+
+...
