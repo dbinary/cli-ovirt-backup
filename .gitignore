@@ -137,5 +137,5 @@ api.http
 ### Ansible ###
 *.retry
 hosts
-
+installer/credentials.yml
 # End of https://www.gitignore.io/api/ansible
