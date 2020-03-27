@@ -3,8 +3,18 @@
   hosts: all
   vars:
     epel: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+    dev_packages:
+      - gcc
+      - gcc-c++
+      - libcurl-devel
     packages:
       - python3
+      - git
+      - python3-pycurl
+    py_packages:
+      - ovirt-engine-sdk-python
+      - Click
+      - git+https://github.com/dbinary/cli-ovirt-backup.git # https://github.com/dbinary/cli-ovirt-backup
     rhel_repositories:
       - rhel-8-for-x86_64-baseos-rpms
       - rhel-8-for-x86_64-appstream-rpms
@@ -24,8 +34,9 @@
         - ansible_facts['distribution_major_version'] == "8"
         - ansible_facts['distribution']  == "RedHat"
     - name: Activating PowerTools repository
-      command: "dnf config-manager --set-enabled PowerTools"
-      warn: false
+      command:
+        cmd: "dnf config-manager --set-enabled PowerTools"
+        warn: false
       when:
         - ansible_facts['distribution']  == "CentOS"
         - ansible_facts['distribution_major_version'] == "8"
@@ -33,5 +44,12 @@
       yum:
         name: "{{ packages }}"
         state: present
-
+    - name: Install development packages
+      yum:
+        name: "{{ dev_packages }}"
+        state: present
+    - name: Install python packages and software
+      pip:
+        name: "{{ item }}"
+      loop: "{{ py_packages }}"
 ...
