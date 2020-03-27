@@ -3,14 +3,19 @@
   hosts: all
   vars:
     epel: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+    clean: false
     dev_packages:
       - gcc
-      - gcc-c++
       - libcurl-devel
+      - libxml2-devel
+      - openssl-devel
+      - python36-devel
     packages:
       - python3
       - git
       - python3-pycurl
+      - nss
+      - python3-lxml
     py_packages:
       - ovirt-engine-sdk-python
       - Click
@@ -52,4 +57,9 @@
       pip:
         name: "{{ item }}"
       loop: "{{ py_packages }}"
+    - name: Cleaning dev packages
+      yum:
+        name: "{{ dev_packages }}"
+        state: absent
+      when: clean|bool
 ...
