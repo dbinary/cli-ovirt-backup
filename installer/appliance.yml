@@ -25,6 +25,7 @@
         - ansible_facts['distribution']  == "RedHat"
     - name: Activating PowerTools repository
       command: "dnf config-manager --set-enabled PowerTools"
+      warn: false
       when:
         - ansible_facts['distribution']  == "CentOS"
         - ansible_facts['distribution_major_version'] == "8"
