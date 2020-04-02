@@ -19,6 +19,7 @@
     py_packages:
       - ovirt-engine-sdk-python
       - Click
+      - click-shell
       - git+https://github.com/dbinary/cli-ovirt-backup.git # https://github.com/dbinary/cli-ovirt-backup
     rhel_repositories:
       - rhel-8-for-x86_64-baseos-rpms
@@ -26,6 +27,11 @@
       - rhel-8-for-x86_64-supplementary-rpms
       - codeready-builder-for-rhel-8-x86_64-rpms
   tasks:
+    - name: Configure udev devices
+      copy:
+        src: 01-local.rules
+        dest: /etc/udev/rules.d/
+      notify: Reboot
     - name: Install epel repository
       yum:
         name: "{{ epel }}"
@@ -62,4 +68,8 @@
         name: "{{ dev_packages }}"
         state: absent
       when: clean|bool
+  handlers:
+    - name: Reboot
+      reboot:
+        test_command: uptime
 ...
