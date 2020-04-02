@@ -12,7 +12,8 @@ setup(
     license='MIT',
     install_requires=[
         'Click',
-        'ovirt-engine-sdk-python'
+        'ovirt-engine-sdk-python',
+        'click-shell'
     ],
     entry_points='''
         [console_scripts]
