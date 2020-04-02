@@ -139,3 +139,5 @@ api.http
 hosts
 installer/credentials.yml
 # End of https://www.gitignore.io/api/ansible
+
+delete_error.txt
