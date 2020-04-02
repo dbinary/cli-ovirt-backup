@@ -10,6 +10,7 @@ from time import sleep
 import click
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
+from click_shell import shell
 
 import helpers
 
@@ -27,7 +28,8 @@ def print_version(ctx, param, value):
     ctx.exit()
 
 
-@click.group()
+# @click.group()
+@shell(prompt='cliobr => ', intro='Starting cliobr shell...')
 @click.option('--version', '-v', is_flag=True, callback=print_version, expose_value=False, is_eager=True)
 def cli():
     pass
@@ -366,7 +368,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     metadata = []
     metas = {}
     elements = ["boot", "volume-format", "diskId",
-                "disk-alias", "disk-description", "size", "fileRef"]
+                "disk-alias", "disk-description", "size", "fileRef", "parentRef"]
 
     logging.info('[{}] Extracting ovf data'.format(event_id))
     if debug:
@@ -388,8 +390,10 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     if debug:
         click.echo('[{}] Defining disks'.format(event_id))
     for meta in metadata:
-        logging.info('[{}] Defining disk {} with image {} and size {}'.format(event_id,
-                                                                              meta['fileRef'], meta['fileRef_image'], meta['size']))
+        if meta["parentRef"]:
+            continue
+        logging.info('[{}] Defining disk {} with image {} and size {}'.format(
+            event_id, meta['fileRef'], meta['fileRef_image'], meta['size']))
 
         if debug:
             click.echo('[{}] Defining disk {}'.format(
