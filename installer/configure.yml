@@ -16,6 +16,7 @@
       - python3-pycurl
       - nss
       - python3-lxml
+      - qemu-img
     py_packages:
       - ovirt-engine-sdk-python
       - Click
@@ -29,8 +30,12 @@
   tasks:
     - name: Configure udev devices
       copy:
-        src: 01-local.rules
-        dest: /etc/udev/rules.d/
+        content: |
+          '# SCSI devices
+          KERNEL=="sd*", ENV{ID_SCSI_SERIAL}!="?*", IMPORT{program}="scsi_id --export --whitelisted -d $devnode", ENV{ID_BUS}="scsi"
+          KERNEL=="sd*", ENV{DEVTYPE}=="disk", ENV{ID_SCSI_SERIAL}=="?*", SYMLINK+="backup/$env{ID_SCSI_SERIAL}"
+          KERNEL=="sd*", ENV{DEVTYPE}=="partition", ENV{ID_SCSI_SERIAL}=="?*", SYMLINK+="backup/$env{ID_SCSI_SERIAL}-part%n"'
+        dest: /etc/udev/rules.d/01-local.rules
       notify: Reboot
     - name: Install epel repository
       yum:
@@ -72,4 +77,3 @@
     - name: Reboot
       reboot:
         test_command: uptime
-...
