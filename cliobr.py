@@ -10,14 +10,15 @@ from time import sleep
 import click
 import ovirtsdk4 as sdk
 import ovirtsdk4.types as types
+import platform
 from click_shell import shell
 
 import helpers
 
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
-AgentVM = 'backuprestore'
+AgentVM = platform.node()
 Description = 'cli-ovirt-backup'
-VERSION = '0.8.2'
+VERSION = '0.8.3'
 ONERROR = 0
 
 
