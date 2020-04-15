@@ -18,7 +18,7 @@ import helpers
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = platform.node()
 Description = 'cli-ovirt-backup'
-VERSION = '0.8.3'
+VERSION = '0.8.4'
 ONERROR = 0
 
 
@@ -208,13 +208,14 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
         if debug:
             click.echo('[{}] Archiving \'{}\' in \'{}.tar.gz\''.format(
                 event_id, vm_backup_absolute, vm_backup_absolute))
-    event_id += 1
+
     if ONERROR == 0:
+        shutil.rmtree(vm_backup_absolute)
         message = (
             '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
             'completed.'.format(event_id, vm.name, Description)
         )
-        helpers.send_events(events_service, event_id,
+        helpers.send_events(events_service, event_id + 1,
                             types, Description, message, vm)
         logging.info(message)
         if debug:
@@ -224,7 +225,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
             '[{}] Backup of virtual machine \'{}\' terminating with return code \'{}\''.format(
                 event_id, vm.name, ONERROR)
         )
-        helpers.send_events(events_service, event_id,
+        helpers.send_events(events_service, event_id + 1,
                             types, Description, message, vm)
         logging.info(message)
         if debug:
@@ -504,12 +505,12 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
             ),
         ),
     )
-    event_id += 1
+
     if ONERROR == 0:
         shutil.rmtree(basedir_obj.absolute().as_posix())
         message = ('[{}] Restore of virtual machine \'{}\' using file \'{}\' is completed.'.format(
             event_id, vm_name, tar_file))
-        helpers.send_events(events_service, event_id,
+        helpers.send_events(events_service, event_id + 1,
                             types, Description, message)
         logging.info(message)
         if debug:
@@ -517,7 +518,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     else:
         message = ('[{}] Restore of vm: {} terminate with return code \'{}\''.format(
             event_id, vm.name, ONERROR))
-        helpers.send_events(events_service, event_id,
+        helpers.send_events(events_service, event_id + 1,
                             types, Description, message)
         logging.info(message)
         if debug:
