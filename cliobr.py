@@ -18,7 +18,7 @@ import helpers
 FORMAT = '%(asctime)s %(levelname)s %(message)s'
 AgentVM = platform.node()
 Description = 'cli-ovirt-backup'
-VERSION = '0.8.3'
+VERSION = '0.8.4'
 ONERROR = 0
 
 
