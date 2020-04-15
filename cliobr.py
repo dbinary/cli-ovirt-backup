@@ -210,6 +210,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
                 event_id, vm_backup_absolute, vm_backup_absolute))
 
     if ONERROR == 0:
+        shutil.rmtree(vm_backup_absolute)
         message = (
             '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
             'completed.'.format(event_id, vm.name, Description)
