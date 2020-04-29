@@ -81,7 +81,7 @@
       when: not online|bool
     - name: Install cli-ovirt-backup
       pip:
-        name: file:///{{ playbook_dir }}/cli-ovirt-backup-master.zip
+        name: file://{{ playbook_dir }}/cli-ovirt-backup-master.zip
       when: not online|bool
     - name: Cleaning dev packages
       yum:
