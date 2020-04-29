@@ -4,6 +4,7 @@
   vars:
     epel: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
     clean: false
+    online: false
     dev_packages:
       - gcc
       - libcurl-devel
@@ -17,11 +18,15 @@
       - nss
       - python3-lxml
       - qemu-img
-    py_packages:
+    py_packages_online:
       - ovirt-engine-sdk-python
       - Click
       - click-shell
       - git+https://github.com/dbinary/cli-ovirt-backup.git # https://github.com/dbinary/cli-ovirt-backup
+    py_packages_offline:
+      - ovirt-engine-sdk-python
+      - Click
+      - click-shell
     rhel_repositories:
       - rhel-8-for-x86_64-baseos-rpms
       - rhel-8-for-x86_64-appstream-rpms
@@ -67,7 +72,17 @@
     - name: Install python packages and software
       pip:
         name: "{{ item }}"
-      loop: "{{ py_packages }}"
+      loop: "{{ py_packages_online }}"
+      when: online|bool
+    - name: Install python packages and software
+      pip:
+        name: "{{ item }}"
+      loop: "{{ py_packages_offline }}"
+      when: not online|bool
+    - name: Install cli-ovirt-backup
+      pip:
+        name: file:///{{ playbook_dir }}/cli-ovirt-backup-master.zip
+      when: not online|bool
     - name: Cleaning dev packages
       yum:
         name: "{{ dev_packages }}"
