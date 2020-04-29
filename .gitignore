@@ -141,3 +141,5 @@ installer/credentials.yml
 # End of https://www.gitignore.io/api/ansible
 
 delete_error.txt
+installer/cli-ovirt-backup-master.zip
+installer/cliobr.tgz
