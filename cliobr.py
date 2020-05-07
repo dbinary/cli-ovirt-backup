@@ -98,7 +98,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
 
     timestamp = time.strftime("%Y%m%d%H%M%S")
     backup_path_obj = Path(backup_path)
-    backup_name_obj = Path(vmname + '-' + timestamp)
+    backup_name_obj = Path(vmname + '-' + timestamp + '-' + vm.id)
     vm_backup_obj = backup_path_obj / backup_name_obj
     vm_backup_absolute = vm_backup_obj.absolute().as_posix()
 
@@ -220,6 +220,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
         logging.info(message)
         if debug:
             click.echo(message)
+        click.echo(vm_backup_absolute + 'tar.gz')
     else:
         message = (
             '[{}] Backup of virtual machine \'{}\' terminating with return code \'{}\''.format(
@@ -515,9 +516,10 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
         logging.info(message)
         if debug:
             click.echo(message)
+        click.echo(vm_name)
     else:
         message = ('[{}] Restore of vm: {} terminate with return code \'{}\''.format(
-            event_id, vm.name, ONERROR))
+            event_id, vm_name, ONERROR))
         helpers.send_events(events_service, event_id + 1,
                             types, Description, message)
         logging.info(message)
