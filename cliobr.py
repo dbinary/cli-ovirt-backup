@@ -294,7 +294,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     vmAgent = helpers.vmobj(vms_service, AgentVM)
 
     # id for event in virt manager
-    event_id = int(time.time())
+    event_id = random.randrange(1, 10**8)
 
     logging.info('[{}] Connected to the server.'.format(event_id))
     if debug:
