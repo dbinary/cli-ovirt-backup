@@ -179,6 +179,7 @@ def make_archive(workingdir, destination, dbg, e_id, log):
         log.error(
             '[{}] Error packing file with return code: {}'.format(e_id, command))
         return command
+    return command
 
 
 def unpack_archive(file, destination, log, e_id):
