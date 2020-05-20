@@ -2,9 +2,11 @@
 - name: Install and Configure cli-ovirt-backup appliance
   hosts: all
   vars:
+    cliobr_package: /dev/mapper/data-containers
     epel: https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
     clean: false
     online: false
+    en_repos: false
     dev_packages:
       - gcc
       - libcurl-devel
@@ -54,6 +56,7 @@
       when:
         - ansible_facts['distribution_major_version'] == "8"
         - ansible_facts['distribution']  == "RedHat"
+        - en_repos|bool
     - name: Activating PowerTools repository
       command:
         cmd: "dnf config-manager --set-enabled PowerTools"
@@ -81,7 +84,7 @@
       when: not online|bool
     - name: Install cli-ovirt-backup
       pip:
-        name: file://{{ playbook_dir }}/cli-ovirt-backup-master.zip
+        name: file://{{ playbook_dir }}/{{ cliobr_package }}
       when: not online|bool
     - name: Cleaning dev packages
       yum:
