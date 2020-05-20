@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import time
+import random
 from pathlib import Path
 from time import sleep
 
@@ -71,7 +72,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     )
 
     # id for event in virt manager
-    event_id = int(time.time())
+    event_id = random.randrange(1, 10**8)
 
     logging.info('[{}] Connected to the server.'.format(event_id))
     if debug:
