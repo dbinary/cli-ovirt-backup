@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import time
+import random
 from pathlib import Path
 from time import sleep
 
@@ -71,7 +72,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
     )
 
     # id for event in virt manager
-    event_id = int(time.time())
+    event_id = random.randrange(1, 10**8)
 
     logging.info('[{}] Connected to the server.'.format(event_id))
     if debug:
@@ -98,7 +99,7 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
 
     timestamp = time.strftime("%Y%m%d%H%M%S")
     backup_path_obj = Path(backup_path)
-    backup_name_obj = Path(vmname + '-' + timestamp)
+    backup_name_obj = Path(vmname + '-' + timestamp + '-' + vm.id)
     vm_backup_obj = backup_path_obj / backup_name_obj
     vm_backup_absolute = vm_backup_obj.absolute().as_posix()
 
@@ -210,7 +211,6 @@ def backup(username, password, ca, vmname, api, debug, backup_path, log, unarchi
                 event_id, vm_backup_absolute, vm_backup_absolute))
 
     if ONERROR == 0:
-        shutil.rmtree(vm_backup_absolute)
         message = (
             '[{}] Backup of virtual machine \'{}\' using snapshot \'{}\' is '
             'completed.'.format(event_id, vm.name, Description)
@@ -293,7 +293,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     vmAgent = helpers.vmobj(vms_service, AgentVM)
 
     # id for event in virt manager
-    event_id = int(time.time())
+    event_id = random.randrange(1, 10**8)
 
     logging.info('[{}] Connected to the server.'.format(event_id))
     if debug:
