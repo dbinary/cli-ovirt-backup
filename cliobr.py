@@ -311,7 +311,7 @@ def restore(username, password, file, ca, api, storage_domain, log, debug, clust
     # Get full path of parent related to "file" variable
     parent_path = p.absolute().parent.as_posix()
 
-    basedir = tar_file.split('.', 2)[0]
+    basedir = tar_file.split('.tar.gz')[0]
     xml_file = ''
 
     basedir_obj = Path(basedir)
